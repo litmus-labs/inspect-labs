@@ -9,7 +9,7 @@ an index release. Robotics remains part of the framework's mission and surface.
 ## Local verification
 
 Run the documented development checks in [README](../README.md#development),
-including the fresh installed-wheel check. It builds four distributions,
+including the fresh installed-wheel check. It builds five distributions,
 installs them outside the checkout, runs native controls and verifies replay.
 Never reuse a stale wheel from an earlier development cycle.
 
@@ -17,7 +17,7 @@ Render the [documentation site](../site/README.md) and run
 `scripts/check-site.py`. Check it on desktop and mobile, including the mobile
 sidebar, search, no horizontal scroll at 375px, PDF viewing and every command
 shown on the site.
-Check that all four package distributions include their MIT license and that
+Check that all five package distributions include their MIT license and that
 the core distribution retains its upstream notice.
 
 Record a local source baseline after reviewing `git status` and the exact staging

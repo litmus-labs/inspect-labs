@@ -114,3 +114,22 @@ Only the 600 nm, three-well control is admitted. A failed read attempt leaves
 completion unknown; an actor's final answer alone cannot become a measurement. The device-free
 backend can neither validate a plate-reader driver on hardware nor establish that
 the chosen QC thresholds are scientifically meaningful.
+
+## SiLA 2 plugin
+
+The separately installed `inspect-labs-sila` package provides a Lab backed by a mock
+SiLA 2 instrument served on localhost. The agent's tool calls the instrument's
+`AbsorbanceReader.ReadWell` command over SiLA 2. The evaluator reads the Readout from
+the instrument's own `RunLog` feature through a separate client. Values are seeded
+synthetic controls. This shows the SiLA 2 integration path and evidence mechanics,
+not a connected real instrument or measurement accuracy.
+
+| File | Responsibility | Public surface | Dependencies | Verification |
+|---|---|---|---|---|
+| [Exports](../plugins/inspect-labs-sila/src/inspect_labs_sila/__init__.py) | Plugin exports | SilaReaderLab, sila_mock_reader, absorbance_read, read_outcome | lab, tasks | SiLA architecture test |
+| [Features](../plugins/inspect-labs-sila/src/inspect_labs_sila/features.py) | SiLA 2 feature definitions for the agent's command and the evaluator's run log | ABSORBANCE_READER_FDL, RUN_LOG_FDL, absorbance_reader_feature, run_log_feature | sila2 | Native workflow tests |
+| [Instrument](../plugins/inspect-labs-sila/src/inspect_labs_sila/instrument.py) | Mock SiLA 2 server with seeded values and its own run log | MockAbsorbanceReader, SEEDED_ABSORBANCE, UnknownWell | sila2, features | Native workflow and lifecycle tests |
+| [Lab](../plugins/inspect-labs-sila/src/inspect_labs_sila/lab.py) | Agent tool over SiLA 2; evaluator Readout from the run log | SilaReaderLab, sila_mock_reader | sila2, Inspect AI, Labs bindings/spec, Pydantic, anyio, instrument | Conformance, unknown-outcome and replay tests |
+| [Task](../plugins/inspect-labs-sila/src/inspect_labs_sila/tasks.py) | Native task, lab scorer and scripted control | absorbance_read, read_outcome, scripted_read, Read | Inspect AI, Pydantic, Labs bindings/tasks, lab | Scripted, model, wrong-report, unknown-well and replay tests |
+
+The plugin's architecture test enforces its inventory and dependency direction.

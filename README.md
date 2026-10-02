@@ -207,14 +207,15 @@ uv pip install --python .venv/bin/python \
   -e '.[dev,pylabrobot,robots]' \
   -e ./plugins/inspect-labs-opentrons \
   -e './plugins/inspect-labs-commec[dev]' \
-  -e ./plugins/inspect-labs-plate-reader
-.venv/bin/python -m pytest tests plugins/inspect-labs-opentrons/tests plugins/inspect-labs-commec/tests plugins/inspect-labs-plate-reader/tests
-.venv/bin/ruff check src tests examples scripts plugins/inspect-labs-opentrons plugins/inspect-labs-commec plugins/inspect-labs-plate-reader
-.venv/bin/mypy --strict src/inspect_labs plugins/inspect-labs-opentrons/src plugins/inspect-labs-commec/src plugins/inspect-labs-plate-reader/src
+  -e ./plugins/inspect-labs-plate-reader \
+  -e ./plugins/inspect-labs-sila
+.venv/bin/python -m pytest tests plugins/inspect-labs-opentrons/tests plugins/inspect-labs-commec/tests plugins/inspect-labs-plate-reader/tests plugins/inspect-labs-sila/tests
+.venv/bin/ruff check src tests examples scripts plugins/inspect-labs-opentrons plugins/inspect-labs-commec plugins/inspect-labs-plate-reader plugins/inspect-labs-sila
+.venv/bin/mypy --strict src/inspect_labs plugins/inspect-labs-opentrons/src plugins/inspect-labs-commec/src plugins/inspect-labs-plate-reader/src plugins/inspect-labs-sila/src
 .venv/bin/python scripts/check-installed.py
 ```
 
-The installed check builds all four wheels, installs them into a temporary Python
+The installed check builds all five wheels, installs them into a temporary Python
 environment outside the checkout, and drives native scripted controls plus
 saved-evidence replay. Private logs stay under `.research/runs/installed-smoke-*`.
 The same commands run in CI. These checks need no model API, Docker database or

@@ -1,4 +1,4 @@
-"""Build and exercise all four non-editable packages outside the checkout."""
+"""Build and exercise all five non-editable packages outside the checkout."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ PACKAGES = (
     ROOT / "plugins/inspect-labs-opentrons",
     ROOT / "plugins/inspect-labs-commec",
     ROOT / "plugins/inspect-labs-plate-reader",
+    ROOT / "plugins/inspect-labs-sila",
 )
 
 
@@ -44,6 +45,7 @@ def verify_installed(work: Path, python: Path) -> None:
     import inspect_labs_commec
     import inspect_labs_opentrons
     import inspect_labs_plate_reader
+    import inspect_labs_sila
     from inspect_ai.log import read_eval_log
     from inspect_robots import read_eval_log as read_robot_log
 
@@ -54,6 +56,7 @@ def verify_installed(work: Path, python: Path) -> None:
         inspect_labs_commec,
         inspect_labs_opentrons,
         inspect_labs_plate_reader,
+        inspect_labs_sila,
     ):
         location = Path(package.__file__).resolve()
         assert "site-packages" in location.parts, location
@@ -65,6 +68,7 @@ def verify_installed(work: Path, python: Path) -> None:
     )
     assert "commec-review" in listing["lab"]
     assert "plate-reader-qc" in listing["lab"]
+    assert "sila-mock-reader" in listing["lab"]
     assert {"opentrons-ot2", "opentrons-ot2-simulator"} <= set(listing["backend"])
     run(
         [str(bin_dir / "inspect-labs"), "doctor", "--lab", "plate-reader-qc"],
@@ -269,6 +273,53 @@ def verify_installed(work: Path, python: Path) -> None:
     )
     assert read_eval_log(str(reader_replay)).samples[0].scores == reader_log.samples[0].scores
 
+    run(
+        [str(bin_dir / "inspect-labs"), "doctor", "--lab", "sila-mock-reader"],
+        cwd=work,
+        log=work / "sila-doctor.log",
+    )
+    run(
+        [
+            str(bin_dir / "inspect"),
+            "eval",
+            "inspect_labs_sila/absorbance_read",
+            "--model",
+            "mockllm/model",
+            "-T",
+            "scripted=true",
+            "-T",
+            f"evidence_dir={work / 'sila-evidence'}",
+            "--log-dir",
+            str(work / "sila"),
+            "--display",
+            "none",
+        ],
+        cwd=work,
+        log=work / "sila.log",
+    )
+    sila_native = one_eval(work / "sila")
+    sila_log = read_eval_log(str(sila_native))
+    assert sila_log.status == "success", sila_log.error
+    sila_score = next(iter(sila_log.samples[0].scores.values())).value
+    assert sila_score["known"] == sila_score["correct"] == 1
+    sila_replay = work / "sila-replay.eval"
+    run(
+        [
+            str(bin_dir / "inspect-labs"),
+            "rescore",
+            str(sila_native),
+            "--evidence",
+            str(sila_native.with_suffix(".labs")),
+            "--output",
+            str(sila_replay),
+            "--scorer",
+            "inspect_labs_sila.tasks:read_outcome",
+        ],
+        cwd=work,
+        log=work / "sila-replay.log",
+    )
+    assert read_eval_log(str(sila_replay)).samples[0].scores == sila_log.samples[0].scores
+
 
 def main() -> None:
     """Build wheels, install them into a fresh external venv, and exercise them."""
@@ -327,7 +378,7 @@ def main() -> None:
             log=work / "smoke.log",
         )
     print(
-        "Installed core, robot, Opentrons, Commec, and reader controls and replay passed; "
+        "Installed core, robot, Opentrons, Commec, reader and SiLA controls and replay passed; "
         f"private logs: {work}"
     )
 

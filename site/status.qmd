@@ -42,15 +42,17 @@ uv pip install --python .venv/bin/python \
   -e '.[dev,pylabrobot,robots]' \
   -e ./plugins/inspect-labs-opentrons \
   -e './plugins/inspect-labs-commec[dev]' \
-  -e ./plugins/inspect-labs-plate-reader
+  -e ./plugins/inspect-labs-plate-reader \
+  -e ./plugins/inspect-labs-sila
 .venv/bin/python -m pytest tests \
   plugins/inspect-labs-opentrons/tests \
   plugins/inspect-labs-commec/tests \
-  plugins/inspect-labs-plate-reader/tests
+  plugins/inspect-labs-plate-reader/tests \
+  plugins/inspect-labs-sila/tests
 .venv/bin/python scripts/check-installed.py
 ```
 
-The installed check builds four wheels and drives native scripted controls and
+The installed check builds five wheels and drives native scripted controls and
 replay in a temporary environment. It needs no model API, scanner database or
 instrument. Architecture boundaries are declared in `docs/design.md` and enforced by
 `tests/test_architecture.py`.
