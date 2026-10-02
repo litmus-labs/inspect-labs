@@ -3,6 +3,7 @@
 The website is a small static site with no hosted backend, telemetry or model calls.
 Its interactive example explains evidence states and is labeled illustrative.
 The visual walkthrough uses vendored Reveal.js with its MIT notice.
+The visual and interaction rules are recorded in [DESIGN.md](DESIGN.md).
 
 From this directory, with Node.js 22.13+ (24 LTS recommended) and Python 3:
 

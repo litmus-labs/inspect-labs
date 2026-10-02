@@ -44,6 +44,25 @@ if (publishing) {
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 await cp(path.join(root, "public"), output, { recursive: true });
+const fontsOutput = path.join(output, "assets/fonts");
+await mkdir(fontsOutput, { recursive: true });
+for (const [source, destination] of [
+  [
+    "@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-wght-normal.woff2",
+    "ibm-plex-sans.woff2",
+  ],
+  ["@fontsource-variable/ibm-plex-sans/LICENSE", "ibm-plex-sans-license.txt"],
+  [
+    "@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-400-normal.woff2",
+    "ibm-plex-mono.woff2",
+  ],
+  ["@fontsource/ibm-plex-mono/LICENSE", "ibm-plex-mono-license.txt"],
+]) {
+  await cp(
+    path.join(root, "node_modules", source),
+    path.join(fontsOutput, destination),
+  );
+}
 const pdfSource = path.join(root, "node_modules/pdfjs-dist");
 const pdfOutput = path.join(output, "vendor/pdfjs");
 await mkdir(pdfOutput, { recursive: true });

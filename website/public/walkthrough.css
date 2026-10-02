@@ -1,14 +1,28 @@
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("/assets/fonts/ibm-plex-sans.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("/assets/fonts/ibm-plex-mono.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
 :root {
-  --ink: #202924;
-  --muted: #52605a;
-  --accent: #245e53;
+  --ink: #13213a;
+  --muted: #526177;
+  --accent: #2759cb;
 }
 body {
-  background: #f7f7f2;
+  background: #f3f6fb;
   color: var(--ink);
 }
 .reveal {
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: "IBM Plex Sans", "Helvetica Neue", sans-serif;
   color: var(--ink);
 }
 .reveal .slides {
@@ -16,12 +30,12 @@ body {
 }
 .reveal h1,
 .reveal h2 {
-  font-family: Georgia, serif;
-  font-weight: 400;
-  line-height: 1.1;
+  font-family: "IBM Plex Sans", "Helvetica Neue", sans-serif;
+  font-weight: 500;
+  line-height: 1.08;
   margin: 20px 0;
   font-size: 53px;
-  letter-spacing: -1px;
+  letter-spacing: -0.05em;
 }
 .reveal h2 {
   font-size: 49px;
@@ -33,10 +47,12 @@ body {
   max-width: 1050px;
 }
 .reveal .eyebrow {
-  font-size: 14px;
-  color: var(--muted);
+  font:
+    12px "IBM Plex Mono",
+    monospace;
+  color: var(--accent);
   text-transform: uppercase;
-  letter-spacing: 1.5px;
+  letter-spacing: 0.08em;
 }
 .diagram {
   width: 100%;
@@ -58,7 +74,7 @@ body {
 .reveal .note {
   font-size: 17px;
   color: var(--muted);
-  border-top: 1px solid #cbd3ca;
+  border-top: 1px solid #cbd4e1;
   padding-top: 16px;
 }
 .deck-columns {
@@ -82,7 +98,9 @@ body {
   position: fixed;
   top: 18px;
   left: 25px;
-  font: 14px sans-serif;
+  font:
+    14px "IBM Plex Sans",
+    sans-serif;
   z-index: 10;
   color: var(--accent);
 }

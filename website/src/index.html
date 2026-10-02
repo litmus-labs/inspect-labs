@@ -8,77 +8,81 @@
       name="description"
       content="Build reusable laboratory environments on Inspect AI to evaluate scientific agents and safeguards across biological software, laboratory services and robots."
     />
-    <meta name="theme-color" content="#f8f8f4" />
+    <meta name="theme-color" content="#101d35" />
     <link rel="icon" href="/assets/favicon.svg" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     {{HEADER}}
     <main id="main">
-      <section class="hero wrap">
-        <div class="hero-copy">
-          <p class="eyebrow">Litmus / Inspect Labs</p>
-          <h1>
-            Evaluate <span class="nowrap">AI-operated</span> laboratory
-            workflows.
-          </h1>
-          <p class="lede">
-            A framework built on Inspect AI to test and evaluate capabilities
-            and safety of agents in autonomous lab workflows.
-          </p>
-          <p class="hero-explanation">
-            Inspect Labs records what an agent requests, what safeguards allow,
-            and what the lab environment shows after an action.
-          </p>
-          <div class="actions">
-            <a class="button" href="{{DOCS_URL}}/quickstart"
-              >Run your first evaluation <span aria-hidden="true">↗</span></a
-            ><a href="/paper/"
-              >Read the paper <span aria-hidden="true">↗</span></a
-            >
-          </div>
-        </div>
-        <figure class="hero-ledger">
-          <div class="ledger-header">
-            <p class="eyebrow">One laboratory evaluation</p>
-            <span>Illustrative case</span>
-          </div>
-          <div class="ledger-steps">
-            <div class="ledger-step">
-              <span class="ledger-number">01 / Agent report</span>
-              <strong>“The measurement completed.”</strong>
-              <small>What the agent says</small>
-            </div>
-            <div class="ledger-step">
-              <span class="ledger-number">02 / Safeguard decision</span>
-              <strong>Request allowed.</strong>
-              <small>What the safeguard permits</small>
-            </div>
-            <div class="ledger-step observed">
-              <span class="ledger-number">03 / Environment record</span>
-              <strong>Job state: completed.</strong>
-              <small>What the laboratory shows</small>
-            </div>
-          </div>
-          <div class="ledger-footer">
-            <p>
-              Inspect AI runs the evaluation. Inspect Labs connects laboratory
-              observations to the task so the report can be checked.
+      <div class="hero-band">
+        <section class="hero wrap">
+          <div class="hero-copy">
+            <p class="eyebrow">Litmus / Inspect Labs</p>
+            <h1>
+              Evaluate <span class="nowrap">AI-operated</span> laboratory
+              workflows.
+            </h1>
+            <p class="lede">
+              A framework built on
+              <a href="https://inspect.aisi.org.uk/">Inspect AI</a> to test and
+              evaluate capabilities and safety of agents in autonomous lab
+              workflows.
             </p>
-            <a href="#examples"
-              >Explore the evidence <span aria-hidden="true">↗</span></a
-            >
+            <p class="hero-explanation">
+              Inspect Labs records what an agent requests, what safeguards
+              allow, and what the lab environment shows after an action.
+            </p>
+            <div class="actions">
+              <a class="button" href="{{DOCS_URL}}/quickstart"
+                >Run your first evaluation <span aria-hidden="true">↗</span></a
+              ><a href="/paper/"
+                >Read the paper <span aria-hidden="true">↗</span></a
+              >
+            </div>
           </div>
-          <figcaption>
-            This is an illustrative example, not a model result. No model,
-            service or robot runs on this page.
-          </figcaption>
-        </figure>
-        <p class="small hero-status">
-          <span class="dot" aria-hidden="true"></span>Early prototype. Robotics
-          is central to our physical laboratory mission.
-        </p>
-      </section>
+          <figure class="hero-ledger">
+            <div class="ledger-header">
+              <p class="eyebrow">One laboratory evaluation</p>
+              <span>Illustrative case</span>
+            </div>
+            <div class="ledger-steps">
+              <div class="ledger-step">
+                <span class="ledger-number">01 / Agent report</span>
+                <strong>“The measurement completed.”</strong>
+                <small>What the agent says</small>
+              </div>
+              <div class="ledger-step">
+                <span class="ledger-number">02 / Safeguard decision</span>
+                <strong>Request allowed.</strong>
+                <small>What the safeguard permits</small>
+              </div>
+              <div class="ledger-step observed">
+                <span class="ledger-number">03 / Environment record</span>
+                <strong>Job state: completed.</strong>
+                <small>What the laboratory shows</small>
+              </div>
+            </div>
+            <div class="ledger-footer">
+              <p>
+                Inspect AI runs the evaluation. Inspect Labs connects laboratory
+                observations to the task so the report can be checked.
+              </p>
+              <a href="#examples"
+                >Explore the evidence <span aria-hidden="true">↗</span></a
+              >
+            </div>
+            <figcaption>
+              This is an illustrative example, not a model result. No model,
+              service or robot runs on this page.
+            </figcaption>
+          </figure>
+          <p class="small hero-status">
+            <span class="dot" aria-hidden="true"></span>Early prototype.
+            Robotics is central to our physical laboratory mission.
+          </p>
+        </section>
+      </div>
       <nav class="page-index wrap" aria-label="On this page">
         <a href="#examples"
           ><span aria-hidden="true">01</span> Evaluate outcomes</a

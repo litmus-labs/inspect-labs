@@ -9,6 +9,10 @@ viewer, worker, fonts and associated notices to `dist/vendor/pdfjs/`. It follows
 the public component approach documented in Mozilla's
 [viewer example](https://github.com/mozilla/pdf.js/tree/master/examples/components).
 
+The website self-hosts IBM Plex Sans and IBM Plex Mono from Fontsource 5.3.0.
+Both fonts use the SIL Open Font License 1.1. The build copies their license
+texts alongside the font files in `dist/assets/fonts/`.
+
 These licenses govern their respective components. The original website source
 uses the repository's MIT license. The paper is a submitted manuscript; the
 software license does not grant a separate permission to publish it during review.
