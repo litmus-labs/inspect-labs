@@ -1,0 +1,77 @@
+[build-system]
+requires = ["hatchling>=1.25,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "inspect-labs"
+version = "0.1.0.dev0"
+description = "Inspect-native evaluation framework for AI-operated laboratory workflows"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE", "src/inspect_labs/THIRD_PARTY_NOTICES.md"]
+requires-python = ">=3.12"
+dependencies = [
+    "inspect-ai==0.3.249",
+    "pydantic>=2.12,<3",
+    "anyio>=4,<5",
+    # Inspect 0.3.249's control server imports fastapi.dependencies.utils.get_flat_dependant,
+    # which FastAPI removed in 0.140.7; newer releases silently disable `inspect ctl`.
+    "fastapi<0.140.7",
+]
+
+[project.entry-points.inspect_ai]
+inspect_labs = "inspect_labs.registry"
+
+[project.entry-points."inspect_labs.backends"]
+simulator = "inspect_labs.liquid_handling:simulator_backend"
+
+[project.entry-points."inspect_labs.environments"]
+liquid-handler = "inspect_labs.liquid_handling:liquid_handler_environment"
+litmus-measurement = "inspect_labs.environments:measurement_environment"
+litmus-handoff = "inspect_labs.environments:handoff_environment"
+robot-handoff = "inspect_labs.robot_workflow:robot_handoff_environment"
+inspect-robots = "inspect_labs.robot_bridge:robot_step_environment"
+
+[project.scripts]
+inspect-labs = "inspect_labs.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "ruff>=0.12,<1", "mypy>=1.15,<2", "build>=1.2,<2"]
+# Native OpenAI/OpenRouter providers. Inspect 0.3.249 declares openai>=2.45; openai 3.x
+# failed at the HTTP transport (httpcore timeout TypeError) before any generation.
+openai = ["openai>=2.45,<3"]
+pylabrobot = ["pylabrobot==0.2.2"]
+robots = ["inspect-robots @ git+https://github.com/robocurve/inspect-robots.git@3c832c34b6c11fa5205ff80ab4947247fedd5eea"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.sdist]
+include = ["src/inspect_labs", "tests", "docs", "examples", "README.md", "LICENSE", "pyproject.toml"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inspect_labs"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+# PyLabRobot ships no type information; keep strict typing everywhere else.
+[[tool.mypy.overrides]]
+module = ["pylabrobot.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["inspect_labs.liquid_handling"]
+disallow_subclassing_any = false

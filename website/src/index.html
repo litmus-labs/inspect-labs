@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Inspect Labs · Evaluate AI-operated laboratory workflows</title>
+    <meta
+      name="description"
+      content="Build reusable laboratory environments on Inspect AI to evaluate scientific agents and safeguards across biological software, laboratory services and robots."
+    />
+    <meta name="theme-color" content="#f7f7f2" />
+    <link rel="icon" href="/assets/favicon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    {{HEADER}}
+    <main id="main">
+      <section class="hero wrap">
+        <div>
+          <p class="eyebrow">A framework built on Inspect AI</p>
+          <h1>
+            Evaluate <span class="nowrap">AI-operated</span> laboratory
+            workflows.
+          </h1>
+          <p class="lede">
+            Build reusable environments to test what scientific agents can
+            accomplish and whether safeguards prevent misuse in practice.
+          </p>
+          <p>
+            From biological software to laboratory services and robots. Inspect
+            AI runs the evaluation. Inspect Labs connects the laboratory and
+            records its outcomes.
+          </p>
+          <div class="actions">
+            <a class="button" href="{{DOCS_URL}}/quickstart"
+              >Run your first evaluation <span aria-hidden="true">↗</span></a
+            ><a href="/paper/"
+              >Read the paper <span aria-hidden="true">↗</span></a
+            >
+          </div>
+          <p class="small status">
+            <span class="dot" aria-hidden="true"></span>Early prototype.
+            Robotics is central to our physical laboratory mission.
+          </p>
+        </div>
+        <figure class="hero-figure">
+          <p class="eyebrow">One laboratory evaluation</p>
+          <div class="flow-node">
+            <span class="small">Native evaluation</span
+            ><strong>Inspect AI</strong
+            ><span>Task · Agent · Tools · Scoring</span>
+          </div>
+          <div class="flow-arrow" aria-hidden="true">↓</div>
+          <div class="flow-node labs">
+            <span class="small">Laboratory connection</span
+            ><strong>Inspect Labs</strong
+            ><span>Environment tools and outcome observations</span>
+          </div>
+          <div class="branches" aria-hidden="true">
+            <span>↓</span><span>↓</span><span>↓</span>
+          </div>
+          <div class="flow-environments">
+            <div><strong>Software</strong><span>Research tools</span></div>
+            <div><strong>Services</strong><span>Jobs and results</span></div>
+            <div><strong>Robots</strong><span>Inspect Robots</span></div>
+          </div>
+          <figcaption>
+            Existing systems execute the work. Inspect Labs connects their
+            observations to the task, so a report can be checked against what
+            happened.
+          </figcaption>
+        </figure>
+      </section>
+      <section class="statement wrap" id="mission">
+        <p class="eyebrow">Why laboratory evaluation</p>
+        <h2>Test safeguards where scientific work happens.</h2>
+        <div class="two-columns">
+          <p>
+            Scientific AI agents can use biological tools, request laboratory
+            services and direct robotic work. Safeguards need to prevent
+            disallowed work while allowing legitimate research.
+          </p>
+          <p>
+            Our first mission is biological misuse prevention. We are building a
+            shared foundation for researchers and providers to evaluate
+            capabilities, test defenses and verify improvements across these
+            workflows.
+          </p>
+        </div>
+      </section>
+      <section class="example-section" id="examples">
+        <div class="wrap">
+          <div class="section-intro">
+            <div>
+              <p class="eyebrow">See what the framework adds</p>
+              <h2>An accepted request<br />is not a completed task.</h2>
+            </div>
+            <p>
+              An agent asks a service for a measurement and reports success. The
+              evaluator needs observations from the service to judge what
+              actually happened.
+            </p>
+          </div>
+          <fieldset class="scenario-controls">
+            <legend>Explore a service outcome</legend>
+            <div>
+              <label
+                ><input
+                  type="radio"
+                  name="scenario"
+                  value="completed"
+                  checked
+                /><span>Measurement completed</span></label
+              ><label
+                ><input type="radio" name="scenario" value="refused" /><span
+                  >Request refused</span
+                ></label
+              ><label
+                ><input type="radio" name="scenario" value="unknown" /><span
+                  >Evidence unavailable</span
+                ></label
+              >
+            </div>
+          </fieldset>
+          <div class="evidence-example" aria-live="polite" aria-atomic="true">
+            <div class="record">
+              <p class="eyebrow">01 · Agent request</p>
+              <h3>Measure a synthetic sample.</h3>
+              <p>Submit the measurement and report the result.</p>
+              <p class="record-label">Agent report</p>
+              <blockquote id="agent-report">
+                “The measurement completed.”
+              </blockquote>
+            </div>
+            <div class="record">
+              <p class="eyebrow">02 · Environment record</p>
+              <h3 id="decision">Request allowed.</h3>
+              <p id="observation">
+                The service records a completed job and its result.
+              </p>
+              <p class="record-label">Independent observation</p>
+              <code id="observation-code">job.state = completed</code>
+            </div>
+            <div class="record result">
+              <p class="eyebrow">03 · Evaluation</p>
+              <h3 id="outcome">Completion observed.</h3>
+              <p id="judgement">
+                The observed job supports completion. The evaluator can check
+                the report against the recorded result.
+              </p>
+              <p class="record-label">Outcome availability</p>
+              <strong id="known">Known</strong>
+            </div>
+          </div>
+          <p class="small example-caption">
+            Illustrative cases, not model results. This page runs no model,
+            service or robot. Missing evidence remains unknown. An unsuccessful
+            task alone does not prove that a safeguard worked.
+          </p>
+          <div class="text-links">
+            <a href="{{DOCS_URL}}/evidence">Read about evidence and replay ↗</a
+            ><a href="/walkthrough/">Open the visual walkthrough ↗</a>
+          </div>
+        </div>
+      </section>
+      <section class="wrap section" id="how-it-works">
+        <p class="eyebrow">A laboratory layer for Inspect AI</p>
+        <h2>Keep the evaluation native.<br />Connect the laboratory.</h2>
+        <div class="responsibilities">
+          <div>
+            <h3>Inspect AI runs the task.</h3>
+            <p>
+              Use its models, agents, tools, approvals, limits, scoring and
+              logs. Inspect Labs evaluations are normal Inspect tasks.
+            </p>
+          </div>
+          <div>
+            <h3>Inspect Labs binds the environment.</h3>
+            <p>
+              Expose scoped laboratory tools, check declared requirements before
+              dispatch and collect observations for judging outcomes.
+            </p>
+          </div>
+          <div>
+            <h3>Lab systems execute the work.</h3>
+            <p>
+              Instrument stacks and services retain execution. Inspect Robots
+              runs robot policies and keeps their native trial records.
+            </p>
+          </div>
+        </div>
+        <figure class="wide-figure">
+          <img
+            src="/assets/architecture.svg"
+            width="1080"
+            height="510"
+            loading="lazy"
+            alt="Inspect AI runs a laboratory task through Inspect Labs environment tools. Laboratory services, simulations and native robot trials provide separate observations to the evaluator."
+          />
+          <figcaption>
+            Agent activity and outcome observations follow separate paths.
+            Linked evidence lets completed evaluations be rescored without
+            submitting new actions.
+          </figcaption>
+        </figure>
+      </section>
+      <section class="wrap section" id="start">
+        <div class="section-intro">
+          <div>
+            <p class="eyebrow">Start with a working control</p>
+            <h2>Install. Run. Inspect.</h2>
+          </div>
+          <p>
+            Run a deterministic liquid-handling control first. Then use the same
+            native task with a model or agent of your choice.
+          </p>
+        </div>
+        <div class="quickstart">
+          <div class="code-block">
+            <div class="code-heading">
+              <span>From the source checkout · Python 3.12+</span
+              ><button id="copy-code" type="button">Copy commands</button>
+            </div>
+            <pre><code id="quickstart-code">uv venv --no-project --python 3.12 .venv
+uv pip install --python .venv/bin/python '.[pylabrobot,openai]'
+source .venv/bin/activate
+inspect eval inspect_labs/serial_dilution --model mockllm/model -T scripted=true
+inspect view</code></pre>
+            <p id="copy-status" role="status" class="small"></p>
+          </div>
+          <div>
+            <h3>No credentials needed.</h3>
+            <p>
+              This control exercises task execution, simulated liquid handling
+              and scoring. It establishes software mechanics, not model
+              performance or scientific validity.
+            </p>
+            <a href="{{DOCS_URL}}/quickstart">Follow the quickstart ↗</a>
+            <p class="small">
+              Live studies require a chosen model, a budget and appropriate
+              authorization.
+            </p>
+          </div>
+        </div>
+      </section>
+      <section class="wrap section" id="environments">
+        <p class="eyebrow">Prototype environments</p>
+        <h2>Start digital. Extend into physical laboratories.</h2>
+        <p class="section-lede">
+          The current connections are building blocks for research environments.
+          Meaningful studies also need domain-reviewed tasks, controls and valid
+          outcome measures.
+        </p>
+        <div class="table-scroll">
+          <table>
+            <caption class="sr-only">
+              Current environment connections and validation limits
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Connection</th>
+                <th scope="col">What you can evaluate</th>
+                <th scope="col">Current evidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Liquid handling</th>
+                <td>
+                  Dilution and transfer tasks with deck, volume and reagent
+                  observations.
+                </td>
+                <td>PyLabRobot simulation and Opentrons simulator controls.</td>
+              </tr>
+              <tr>
+                <th scope="row">Measurement services</th>
+                <td>
+                  Whether a submitted job completed and the report matches its
+                  result.
+                </td>
+                <td>Queued service fixtures and synthetic plate-reader QC.</td>
+              </tr>
+              <tr>
+                <th scope="row">Screening review</th>
+                <td>
+                  Review a screening result and check the independent
+                  disposition.
+                </td>
+                <td>
+                  Common Mechanism plugin mechanics. Full-reference runtime
+                  verification remains pending.
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Robot tasks</th>
+                <td>
+                  Connect native policy trials and their metrics to laboratory
+                  evaluations.
+                </td>
+                <td>
+                  Inspect Robots bridge and deterministic software controls. No
+                  physical validation or RFM study.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          <a href="{{DOCS_URL}}/environments"
+            >Explore the available environments ↗</a
+          >
+        </p>
+      </section>
+      <section class="community">
+        <div class="wrap section">
+          <p class="eyebrow">Build with the research community</p>
+          <h2>Make laboratory evaluations<br />useful across studies.</h2>
+          <p class="section-lede">
+            We aim to partner with researchers and providers to build meaningful
+            environments, test safeguards and verify fixes. Independent use is
+            our next milestone.
+          </p>
+          <div class="two-columns">
+            <div>
+              <h3>Contribute an environment.</h3>
+              <p>
+                Define a consequential research question, connect a permitted
+                system and identify observations that establish the task
+                outcome.
+              </p>
+              <a href="{{DOCS_URL}}/authoring">Read the authoring guide ↗</a>
+            </div>
+            <div>
+              <h3>Develop a study with us.</h3>
+              <p>
+                Bring laboratory expertise, legitimate research cases and a
+                safeguard question. The framework makes methods reusable while
+                sensitive scenarios and provider data stay controlled.
+              </p>
+              <a href="{{DOCS_URL}}/vision">Read the development path ↗</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    {{FOOTER}}
+    <script src="/app.js" defer></script>
+  </body>
+</html>

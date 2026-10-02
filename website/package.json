@@ -1,0 +1,20 @@
+{
+  "name": "inspect-labs-website",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "build:publish": "node build.mjs --publish",
+    "format": "prettier --write .",
+    "check:format": "prettier --check .",
+    "dev": "npm run build && python3 -m http.server 4321 --bind 127.0.0.1 --directory dist"
+  },
+  "devDependencies": {
+    "pdfjs-dist": "6.3.289",
+    "prettier": "3.6.2"
+  }
+}

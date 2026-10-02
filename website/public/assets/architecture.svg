@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="510" viewBox="0 0 1080 510" role="img" aria-labelledby="title desc">
+  <title id="title">Inspect Labs connects reusable laboratory environments to Inspect AI</title>
+  <desc id="desc">Inspect AI runs the agent and workflow scoring. Inspect Labs provides a reusable laboratory interface for task tools, supported operations and separate environment evidence. Examples include services, simulations and robot trials run and scored by Inspect Robots. Saved observations and the agent report reach Inspect AI scoring.</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#222222"/></marker></defs>
+  <rect width="1080" height="510" fill="white"/>
+  <g font-family="Arial, sans-serif" fill="#222222">
+    <text x="30" y="29" font-size="23" font-weight="bold">Evaluation</text>
+    <text x="350" y="29" font-size="23" font-weight="bold">Reusable lab interface</text>
+    <text x="730" y="29" font-size="23" font-weight="bold">Example environments</text>
+  </g>
+  <g font-family="Arial, sans-serif" fill="#222222" font-size="22">
+    <rect x="30" y="60" width="220" height="190" fill="white" stroke="#222222" stroke-width="2"/>
+    <text x="50" y="97" font-size="27" font-weight="bold">Inspect AI</text>
+    <text x="50" y="139">Runs the agent</text><text x="50" y="174">Tools and approvals</text><text x="50" y="209">Evaluation log</text>
+    <rect x="350" y="60" width="280" height="160" fill="white" stroke="#222222" stroke-width="2"/>
+    <text x="370" y="97" font-size="27" font-weight="bold">Inspect Labs</text>
+    <text x="370" y="138">Connects lab tools</text><text x="370" y="171">Checks supported</text><text x="370" y="204">operations</text>
+    <rect x="350" y="250" width="280" height="85" fill="white" stroke="#222222" stroke-width="2" stroke-dasharray="7 5"/>
+    <text x="370" y="284" font-size="22" font-weight="bold">Laboratory evidence</text><text x="370" y="316">Review and rescore</text>
+    <rect x="730" y="60" width="320" height="70" fill="white" stroke="#222222" stroke-width="1.5"/>
+    <text x="750" y="91" font-weight="bold">Software services</text><text x="750" y="117">Jobs and recorded results</text>
+    <rect x="730" y="150" width="320" height="70" fill="white" stroke="#222222" stroke-width="1.5"/>
+    <text x="750" y="181" font-weight="bold">Laboratory simulations</text><text x="750" y="207">Actions and environment state</text>
+    <rect x="730" y="240" width="320" height="95" fill="white" stroke="#222222" stroke-width="1.5"/>
+    <text x="750" y="272" font-weight="bold">Robot trials</text><text x="750" y="299">Inspect Robots runs and</text><text x="750" y="325">scores trials</text>
+    <rect x="30" y="385" width="220" height="95" fill="white" stroke="#222222" stroke-width="2"/>
+    <text x="50" y="414" font-size="22" font-weight="bold">Inspect AI scoring</text><text x="50" y="444" font-size="20">Compares the report</text><text x="50" y="469" font-size="20">with observations</text>
+  </g>
+  <g fill="none" stroke="#222222" stroke-width="2.5" marker-end="url(#arrow)">
+    <path d="M250 120 H350"/>
+    <path d="M630 120 H675 V95 H730"/>
+    <path d="M675 120 V185 H730"/>
+    <path d="M675 185 V285 H730"/>
+    <path d="M140 250 V385"/>
+  </g>
+  <g fill="none" stroke="#222222" stroke-width="2.5" stroke-dasharray="7 5" marker-end="url(#arrow)">
+    <path d="M1050 95 H1068 V365 H490 V335"/>
+    <path d="M1050 185 H1068" marker-end="none"/>
+    <path d="M1050 285 H1068" marker-end="none"/>
+    <path d="M350 293 H305 V435 H250"/>
+  </g>
+  <g font-family="Arial, sans-serif" fill="#222222" font-size="20">
+    <text x="261" y="106">Tool calls</text><text x="642" y="79">Requests</text>
+    <text x="153" y="329">Agent report</text><text x="580" y="393">Environment observations</text>
+    <text x="324" y="458">Saved observations</text>
+    <text x="30" y="505" font-size="20">Solid lines show agent activity. Dashed lines show observations. Environments are separate examples.</text>
+  </g>
+</svg>

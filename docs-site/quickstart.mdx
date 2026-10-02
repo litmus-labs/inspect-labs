@@ -1,0 +1,89 @@
+---
+title: "Run your first evaluation"
+description: "Install from the checkout and run a deterministic laboratory control with native Inspect."
+---
+
+## Install
+
+Use Python 3.12 or newer and [uv](https://docs.astral.sh/uv/). Run these commands from
+the Inspect Labs checkout. The package is installed from local source.
+
+```bash
+uv venv --no-project --python 3.12 .venv
+uv pip install --python .venv/bin/python '.[pylabrobot]'
+source .venv/bin/activate
+```
+
+The `pylabrobot` extra supplies the liquid-handling environment. The core package
+includes synthetic measurement and report-transfer services.
+
+## Run a scripted control
+
+```bash
+umask 077
+inspect eval inspect_labs/serial_dilution \
+  --model mockllm/model -T scripted=true \
+  -T evidence_dir=.research/dilution-evidence \
+  --log-dir .research/dilution-logs
+inspect view --log-dir .research/dilution-logs
+```
+
+This control carries out a predefined dilution protocol in a PyLabRobot-backed
+simulator. It requires no model credentials and operates no hardware. Inspect runs
+the task and opens its native viewer. Inspect Labs records the final deck observations
+and scores concentrations, volumes and reagent integrity.
+
+`scripted=true` selects the control explicitly. A successful control checks the
+software path, not an AI model's capability or the scientific validity of the simulator.
+
+## Inspect the result
+
+Look for the native `.eval` log in the log directory. When evidence collection
+finishes, a linked `.labs` companion records the evaluator's observations and artifact
+hashes. Keep both files and their supporting artifacts at their recorded paths.
+
+Reference tasks distinguish:
+
+- `known` indicates that an outcome was observed.
+- `executed` indicates that the required work occurred.
+- `honest` checks the agent's final report against the observations.
+- `correct` requires the reference task's execution and reporting conditions.
+
+Unknown outcomes are unscored. They are not counted as successful prevention.
+
+## Rescore saved evidence
+
+Replace the paths below with the files from your run. Choose a new output path.
+
+```bash
+inspect-labs rescore path/to/run.eval \
+  --evidence path/to/run.labs \
+  --output path/to/run.rescored.eval
+```
+
+Rescoring verifies the saved links and applies the judge without running the agent or
+laboratory again. See [evidence and replay](/evidence).
+
+## Evaluate a model
+
+Install the optional provider dependency if your selected native Inspect provider
+requires it:
+
+```bash
+uv pip install --python .venv/bin/python '.[openai]'
+```
+
+Choose the model, study conditions and budget before running. Omit `scripted=true` to
+use native model generation:
+
+```bash
+inspect eval inspect_labs/serial_dilution \
+  --model PROVIDER/MODEL \
+  -T evidence_dir=.research/model-evidence \
+  --log-dir .research/model-logs
+```
+
+Configure credentials using the chosen provider's native Inspect instructions. Do not
+put them in a task, dataset, tool response or public log. Native per-sample cost limits
+require model price data and are not strict billing caps. The convenience CLI also
+requires `--allow-live` and an enforceable cost limit for live runs.

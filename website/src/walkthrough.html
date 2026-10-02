@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Visual walkthrough · Inspect Labs</title>
+    <link rel="icon" href="/assets/favicon.svg" />
+    <link rel="stylesheet" href="/vendor/reveal.css" />
+    <link rel="stylesheet" href="/walkthrough.css" />
+  </head>
+  <body>
+    <a class="deck-home" href="/">← Inspect Labs</a>
+    <div class="reveal">
+      <div class="slides">
+        <section>
+          <p class="eyebrow">Inspect Labs · Early prototype</p>
+          <h1>Evaluate AI-operated laboratory workflows.</h1>
+          <p>
+            Build reusable environments to test what scientific agents can
+            accomplish and whether safeguards prevent misuse in practice.
+          </p>
+          <div
+            class="diagram-scroll"
+            role="region"
+            aria-label="Framework diagram"
+            tabindex="0"
+          >
+            <img
+              class="diagram"
+              src="/assets/architecture.svg"
+              width="1080"
+              height="510"
+              alt="Inspect AI runs the task, Inspect Labs connects laboratory tools and observations, and laboratory systems execute the work."
+            />
+          </div>
+          <p class="diagram-hint">Scroll the diagram sideways to read it.</p>
+          <p class="note">
+            Use the arrow keys or controls to continue. Press Escape for an
+            overview. On a phone, scroll through the walkthrough.
+          </p>
+        </section>
+        <section>
+          <p class="eyebrow">The laboratory evaluation gap</p>
+          <h2>Check the outcome,<br />not just the report.</h2>
+          <p>
+            An agent can report success after a request is accepted. The
+            evaluator still needs to know what happened in the laboratory.
+          </p>
+          <div class="deck-columns">
+            <div>
+              <h3>Agent activity</h3>
+              <p>What was requested.<br />What was reported.</p>
+            </div>
+            <div>
+              <h3>Environment observations</h3>
+              <p>What was permitted.<br />What was executed and observed.</p>
+            </div>
+          </div>
+          <p class="note">
+            Inspect Labs connects these records within a native Inspect AI
+            evaluation.
+          </p>
+        </section>
+        <section>
+          <p class="eyebrow">An illustrative service task</p>
+          <h2>Missing evidence stays unknown.</h2>
+          <div
+            class="diagram-scroll"
+            role="region"
+            aria-label="Outcome diagram"
+            tabindex="0"
+          >
+            <img
+              class="diagram"
+              src="/assets/outcomes.svg"
+              width="1080"
+              height="365"
+              alt="Completed, incomplete and unknown service outcomes need different evidence. Acceptance alone does not prove completion."
+            />
+          </div>
+          <p class="diagram-hint">Scroll the diagram sideways to read it.</p>
+          <p class="note">
+            Illustrative cases, not experimental results. Task failure alone
+            does not establish safeguard effectiveness.
+          </p>
+        </section>
+        <section>
+          <p class="eyebrow">Build with the research community</p>
+          <h2>Build laboratory evaluations<br />that researchers can reuse.</h2>
+          <p>
+            Bring a laboratory task and a safeguard question. Define valid
+            observations, include legitimate controls and make the evaluation
+            reusable.
+          </p>
+          <p>
+            <a href="{{DOCS_URL}}/authoring">Read the authoring guide ↗</a>
+          </p>
+          <p class="note">
+            Software mechanics are implemented. Scientific validity, physical
+            validation and independent adoption remain future evidence.
+          </p>
+        </section>
+      </div>
+    </div>
+    <script src="/vendor/reveal.js"></script>
+    <script src="/walkthrough.js"></script>
+  </body>
+</html>

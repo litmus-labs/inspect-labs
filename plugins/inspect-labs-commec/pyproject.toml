@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling>=1.25,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "inspect-labs-commec"
+version = "0.1.0.dev0"
+description = "Native Inspect workflows around IBBIS Common Mechanism screening"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = ["inspect-labs", "pyyaml>=6,<7"]
+
+[project.optional-dependencies]
+dev = ["types-PyYAML>=6,<7"]
+
+[project.scripts]
+inspect-labs-commec-rescore = "inspect_labs_commec.rescore:main"
+
+[project.entry-points.inspect_ai]
+inspect_labs_commec = "inspect_labs_commec.tasks"
+
+[project.entry-points."inspect_labs.environments"]
+commec-review = "inspect_labs_commec.environment:review_environment"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inspect_labs_commec"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "runtime", "README.md", "LICENSE", "pyproject.toml"]

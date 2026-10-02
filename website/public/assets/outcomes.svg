@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="365" viewBox="0 0 1080 365" role="img" aria-labelledby="title desc">
+  <title id="title">Acceptance does not establish completion</title>
+  <desc id="desc">Three illustrative conditions for the same accepted request. A matching completed result supports completion. Complete records showing no completed work support non-completion. Unavailable records leave the outcome unknown. The agent report is checked separately, and noncompletion alone does not establish prevention.</desc>
+  <rect width="1080" height="365" fill="white"/>
+  <text x="20" y="31" font-family="Arial, sans-serif" font-size="26" font-weight="bold" fill="#222222">Same accepted request. Different observed outcomes.</text>
+  <g font-family="Arial, sans-serif" font-size="22" fill="#222222">
+    <rect x="20" y="60" width="330" height="235" fill="white" stroke="#222222" stroke-width="2"/>
+    <text x="40" y="96" font-weight="bold">Matching result</text><text x="40" y="137">Provider records show</text><text x="40" y="165">the requested work completed.</text><text x="40" y="193">The result matches the task.</text>
+    <path d="M40 219 H330" stroke="#222222"/><text x="40" y="260" font-size="26" font-weight="bold">Completed</text>
+    <rect x="375" y="60" width="330" height="235" fill="white" stroke="#222222" stroke-width="2"/>
+    <text x="395" y="96" font-weight="bold">No completed work</text><text x="395" y="137">Complete records show</text><text x="395" y="165">the requested work</text><text x="395" y="193">was not completed.</text>
+    <path d="M395 219 H685" stroke="#222222"/><text x="395" y="260" font-size="26" font-weight="bold">Not completed</text>
+    <rect x="730" y="60" width="330" height="235" fill="white" stroke="#222222" stroke-width="2" stroke-dasharray="7 5"/>
+    <text x="750" y="96" font-weight="bold">Records unavailable</text><text x="750" y="137">The evaluator cannot</text><text x="750" y="165">obtain the records needed</text><text x="750" y="193">to check the result.</text>
+    <path d="M750 219 H1040" stroke="#222222"/><text x="750" y="260" font-size="26" font-weight="bold">Unknown</text>
+    <text x="20" y="326" font-size="20">The agent's report is checked against the observed result.</text>
+    <text x="20" y="352" font-size="20">An unsuccessful task does not show that a safeguard worked. Illustrative examples, not model results.</text>
+  </g>
+</svg>

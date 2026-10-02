@@ -1,0 +1,78 @@
+---
+title: "Public API and commands"
+description: "The small binding surface around native Inspect tasks."
+---
+
+## Core Python API
+
+These names are exported by `inspect_labs`:
+
+| Name | Purpose |
+| --- | --- |
+| `EnvironmentInfo` | Declare environment version, mode, capabilities and operations |
+| `LabEnvironment` | Structural protocol for tools, read-only observation, artifacts and close |
+| `LabEvidence` | Sample identity, environment and separately collected observation payload |
+| `bind_task` | Attach environment setup, evidence scoring and cleanup to an unscored native task |
+| `evidence_scorer` | Build a native scorer using collected laboratory evidence |
+| `rescore_workflow` | Reapply a trusted judge to linked saved evidence with zero dispatch |
+| `check_environment` | Check lifecycle, tools, observation stability and artifact mechanics |
+| `ConformanceReport` | Report the clauses checked and any violations |
+
+### bind_task
+
+```python
+def bind_task(
+    task,
+    *,
+    environment,
+    judge,
+    requires,
+    evidence_dir,
+    allow_physical=False,
+    observation_timeout=30,
+    metrics=("known", "correct"),
+): ...
+```
+
+The factory receives native `TaskState` and returns a fresh `LabEnvironment`.
+`requires` is either a capability set or typed `Requirements` from
+`inspect_labs.spec`. `metrics` must include every key the judge can return, including
+`known` and `correct`. Existing task scorers are rejected to keep outcome ownership
+explicit.
+
+### rescore_workflow
+
+```python
+def rescore_workflow(native_log, evidence_file, output, judge, metrics=None): ...
+```
+
+Paths are `pathlib.Path` objects. The output must not exist. Omitted `metrics` uses
+the keys recorded at binding time. Missing files or provenance mismatches fail
+clearly rather than rerunning the workflow.
+
+## Native execution
+
+Use `inspect eval` for task execution and `inspect view` for native logs. The
+`inspect-labs` CLI is a convenience surface around native execution, discovery and
+replay, not another runner.
+
+```bash
+inspect-labs --help
+inspect-labs list
+inspect-labs doctor --environment litmus-measurement
+inspect-labs run --task measurement --scripted
+inspect-labs rescore run.eval --evidence run.labs --output replay.eval
+```
+
+`run` supports measurement and handoff reference tasks. Other tasks use native
+`inspect eval`. Live `run` requests require explicit `--allow-live`, a model and an
+enforceable `--cost-limit`. `--price INPUT OUTPUT` supplies missing model prices in
+USD per million tokens. A native per-sample limit is not a strict billing cap.
+
+## Upstream documentation
+
+- [Inspect AI](https://inspect.aisi.org.uk/) for tasks, models, agents, tools, approvals and logs
+- [Inspect Robots](https://github.com/robocurve/inspect-robots) for robot policy and embodiment interfaces
+- [PyLabRobot](https://docs.pylabrobot.org/) for laboratory instrument interfaces
+
+The API is provisional. See [status](/status) before depending on it.

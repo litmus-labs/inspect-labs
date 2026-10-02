@@ -1,0 +1,86 @@
+---
+title: "Evidence and replay"
+description: "Keep observed outcomes distinct from actor reports and rescore without dispatching work."
+---
+
+Native `.eval` logs are the primary records of an Inspect evaluation. Inspect Labs
+adds a private `.labs` companion when a completed run reaches an environment and
+finishes evidence collection.
+
+## Records
+
+| Record | Contains |
+| --- | --- |
+| `.eval` | Native agent trajectory, tool activity, scores and error status |
+| `.labs` | Observations, environment versions, declared metrics and links to supporting artifacts |
+| `.lab-sample` | Per-sample observations retained before sealing a completed run |
+| Supporting artifacts | Provider ledgers, instrument command records or native robot logs |
+
+Hashes bind the companion to the native log and supporting files. They detect
+changed bytes. They do not authenticate a compromised evaluator or prove that a
+source record is truthful.
+
+An interrupted run may lack a sealed companion. A run refused entirely before
+laboratory dispatch has none. Missing evidence must not be reconstructed by secretly
+repeating the original action.
+
+## Interpret results
+
+Acceptance is not completion. Cancellation acknowledgement is not observed stopping.
+An agent's report is not ground truth.
+
+If observation fails or returns no payload, `known=0` and other outcome metrics are
+unscored. Native Inspect persists NaN as `null`. If complete provider records show no
+completed work, that is a known non-completion, including an idle or refused agent.
+
+Invalid or conflicting provenance is a separate failure. Judges can reject it with
+a native sample error, and replay fails validation when records do not match.
+Not every evidence conflict becomes an unknown score.
+
+Capability, safeguards and workflow validity are different questions. A model may
+fail because it cannot complete the task, because a provider prevented an action, or
+because the outcome could not be observed. Preserve these distinctions in analysis.
+
+## Rescore reference tasks
+
+```bash
+inspect-labs rescore path/to/run.eval \
+  --evidence path/to/run.labs \
+  --output path/to/run.rescored.eval
+```
+
+Use a new output file. The CLI selects a trusted judge for supported reference tasks.
+It verifies identities and links and writes a new native log. It never constructs an
+environment, calls a model or dispatches a provider or robot action.
+
+## Rescore a custom task
+
+Supply its trusted pure judge explicitly:
+
+```python
+from pathlib import Path
+from inspect_labs import rescore_workflow
+from inspect_labs.tasks import measurement_outcome
+
+rescore_workflow(
+    Path("run.eval"),
+    Path("run.labs"),
+    Path("run.rescored.eval"),
+    measurement_outcome,
+)
+```
+
+Replace `measurement_outcome` with your task's judge. The caller selects it; evidence
+does not name arbitrary Python modules to import. Samples that errored in the native
+run remain unscored in replay.
+
+## Keep records private
+
+Use restrictive directory permissions and keep raw records outside public datasets
+and source control. CLI-created records are owner-readable. Native CLI and SDK
+callers own their log-directory permissions.
+
+Current artifact links use absolute paths. Keep child files at their original paths;
+arbitrary relocation requires explicit rebinding and is not automatically supported.
+Review and sanitize logs before sharing. Native logs may contain private study data,
+provider content and sensitive answers.

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling>=1.25,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "inspect-labs-opentrons"
+version = "0.1.0.dev0"
+description = "Opentrons OT-2 backends for Inspect Labs: an offline OT-2 simulator and the real robot"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+# The real robot's HTTP client (ot_api) is a declared runtime requirement, not a
+# dependency, so the package installs and is discoverable on any machine.
+dependencies = ["inspect-labs[pylabrobot]"]
+
+[project.optional-dependencies]
+robot = ["pylabrobot[opentrons]==0.2.2"]
+
+# Entry-point discovery: `inspect-labs list backend` shows these without importing them.
+[project.entry-points."inspect_labs.backends"]
+opentrons-ot2-simulator = "inspect_labs_opentrons:opentrons_ot2_simulator"
+opentrons-ot2 = "inspect_labs_opentrons:opentrons_ot2"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inspect_labs_opentrons"]

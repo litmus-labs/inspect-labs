@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling>=1.25,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "inspect-labs-plate-reader"
+version = "0.1.0.dev0"
+description = "Native Inspect absorbance QC workflow using PyLabRobot's plate-reader interface"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = ["inspect-labs[pylabrobot]"]
+
+[project.entry-points.inspect_ai]
+inspect_labs_plate_reader = "inspect_labs_plate_reader.tasks"
+
+[project.entry-points."inspect_labs.environments"]
+plate-reader-qc = "inspect_labs_plate_reader.environment:plate_reader_environment"
+
+[project.scripts]
+inspect-labs-plate-reader-rescore = "inspect_labs_plate_reader.rescore:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inspect_labs_plate_reader"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "LICENSE", "pyproject.toml"]

@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.11.31"
+      - name: Install Python and development dependencies
+        run: |
+          uv python install 3.12
+          uv venv --no-project --python 3.12 .venv
+          uv pip install --python .venv/bin/python \
+            -e '.[dev,pylabrobot,robots]' \
+            -e ./plugins/inspect-labs-opentrons \
+            -e './plugins/inspect-labs-commec[dev]' \
+            -e ./plugins/inspect-labs-plate-reader
+      - name: Tests
+        run: .venv/bin/python -m pytest tests plugins/inspect-labs-opentrons/tests plugins/inspect-labs-commec/tests plugins/inspect-labs-plate-reader/tests
+      - name: Lint and types
+        run: |
+          .venv/bin/ruff check src tests examples scripts plugins/inspect-labs-opentrons plugins/inspect-labs-commec plugins/inspect-labs-plate-reader
+          .venv/bin/mypy --strict src/inspect_labs plugins/inspect-labs-opentrons/src plugins/inspect-labs-commec/src plugins/inspect-labs-plate-reader/src
+      - name: Installed wheels and native controls
+        run: .venv/bin/python scripts/check-installed.py
+
+  documentation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+      - name: Build framework website
+        run: |
+          npm --prefix website ci
+          npm --prefix website run check:format
+          npm --prefix website run build
+      - name: Validate documentation
+        working-directory: docs-site
+        run: |
+          npm ci
+          npm run validate
+          npm run check:links

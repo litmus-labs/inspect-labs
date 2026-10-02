@@ -1,0 +1,43 @@
+---
+title: "Inspect Labs"
+description: "Evaluate scientific agents and safeguards across laboratory software, services and robots."
+---
+
+Inspect Labs is a framework built on Inspect AI for evaluating AI-operated laboratory
+workflows. It connects an evaluation task to laboratory tools and separately collected
+observations of what happened.
+
+Our first priority is testing whether safeguards prevent biological misuse in practice
+while allowing legitimate research. Robotics is central to extending these evaluations
+into physical laboratories.
+
+## What it provides
+
+| Need | Inspect Labs provides |
+| --- | --- |
+| Let an agent operate a laboratory environment | Scoped native Inspect tools connected to an existing service, instrument stack or simulator |
+| Check whether a task can run | Environment declarations and requirements checked before actor dispatch |
+| Establish a task outcome | A separate observation channel and a task-specific judge |
+| Review an evaluation later | Saved observations linked to native logs and supporting artifacts |
+| Change scoring without repeating work | Evidence replay with no model, provider or robot dispatch |
+
+Inspect AI owns task execution, models, agents, approvals, limits, scoring and logs.
+Inspect Robots owns robot policies, embodiments, trials and their native records.
+Existing laboratory stacks operate instruments and services. Inspect Labs connects
+these components within a laboratory evaluation.
+
+## Start here
+
+- [Run a scripted control](/quickstart) to check installation without credentials.
+- [Understand the evaluation model](/concepts) before choosing observations and scores.
+- [Author a task](/authoring) using the native Inspect API.
+- [Read the vision](/vision) for the studies and partnerships we aim to support.
+
+## Prototype status
+
+The package includes simulated liquid handling, synthetic service workflows and a
+native robot bridge. These establish software mechanics. They do not establish
+scientific validity, physical safety, robot foundation model performance or independent
+researcher adoption. [Status and limits](/status) explains the current evidence.
+
+Litmus maintains Inspect Labs. Litmus Labs names the research environments.
