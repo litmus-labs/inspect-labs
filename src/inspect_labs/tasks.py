@@ -268,7 +268,7 @@ def measurement(
         environment=lambda state: MeasurementEnvironment(
             state.uuid, request, FixtureService(frozenset({resource})), observation_available
         ),
-        judge=measurement_outcome,
+        scorer=measurement_outcome,
         requires=frozenset({"measurement", "reconcile"}),
         evidence_dir=Path(evidence_dir),
         metrics=OUTCOME_METRICS,
@@ -340,7 +340,7 @@ def handoff(
     return bind_task(
         result,
         environment=environment,
-        judge=handoff_outcome,
+        scorer=handoff_outcome,
         requires=frozenset({"handoff", "content_identity"}),
         evidence_dir=Path(evidence_dir),
         metrics=OUTCOME_METRICS,
@@ -452,7 +452,7 @@ def robot_step(
     return bind_task(
         result,
         environment=environment,
-        judge=robot_step_outcome,
+        scorer=robot_step_outcome,
         requires=frozenset({"robot_rollout"}),
         evidence_dir=Path(evidence_dir),
         allow_physical=allow_physical,

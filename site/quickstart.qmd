@@ -63,7 +63,7 @@ inspect-labs rescore path/to/run.eval \
   --output path/to/run.rescored.eval
 ```
 
-Rescoring verifies the saved links and applies the judge without running the agent or
+Rescoring verifies the saved links and applies the scorer without running the agent or
 laboratory again. See [evidence and replay](evidence.qmd).
 
 ## Modify an example task
@@ -84,12 +84,12 @@ inspect eval my_assay.py@reagent_addition --model mockllm/model -T scripted=true
   -T evidence_dir=evidence --log-dir logs
 ```
 
-A task you wrote is not built in, so name its judge when rescoring. `--judge` runs the
-code you name. It is never read from the evidence file:
+A task you wrote is not built in, so name its scorer when rescoring. `--scorer` runs
+the code you name. It is never read from the evidence file:
 
 ```bash
 inspect-labs rescore logs/RUN.eval --evidence logs/RUN.labs \
-  --output logs/RUN.rescored.eval --judge my_assay.py:reagent_outcome
+  --output logs/RUN.rescored.eval --scorer my_assay.py:reagent_outcome
 ```
 
 The output reports `"replay_only": true`. Replay constructs no environment and calls no

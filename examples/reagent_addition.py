@@ -108,7 +108,7 @@ def reagent_addition(
             message_limit=120,
         ),
         environment=environment,
-        judge=reagent_outcome,
+        scorer=reagent_outcome,
         requires=Requirements(
             capabilities=frozenset({"liquid_handling"}),
             operations={

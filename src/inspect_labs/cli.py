@@ -100,9 +100,12 @@ def main() -> None:
     replay.add_argument("--evidence", type=Path, required=True)
     replay.add_argument("--output", type=Path, required=True)
     replay.add_argument(
+        "--scorer",
         "--judge",
-        help="Judge for a custom task as FILE.py:function or module:function. This runs "
-        "the named code; it is chosen by you, never read from the evidence file.",
+        dest="scorer",
+        help="Lab scorer for a custom task as FILE.py:function or module:function. This "
+        "runs the named code; it is chosen by you, never read from the evidence file. "
+        "--judge is an earlier spelling.",
     )
     listing = commands.add_parser("list", help="List installed Labs and backends")
     listing.add_argument("kind", nargs="?", choices=["lab", "backend", "environment"])
@@ -170,14 +173,14 @@ def main() -> None:
                             "robot_step": robot_step_outcome,
                         }
                         task_name = bundle.task.rsplit("/", 1)[-1]
-                        if args.judge:
-                            judge = load_judge(args.judge)
+                        if args.scorer:
+                            judge = load_judge(args.scorer)
                         elif task_name in judges:
                             judge = judges[task_name]
                         else:
                             parser.error(
-                                f"Task {bundle.task!r} is not built in: pass its judge with "
-                                "--judge FILE.py:function (for example my_task.py:my_outcome)"
+                                f"Task {bundle.task!r} is not built in: pass its scorer with "
+                                "--scorer FILE.py:function (for example my_task.py:my_outcome)"
                             )
                         rescore_workflow(args.native_log, args.evidence, args.output, judge)
                         log = read_eval_log(str(args.output))

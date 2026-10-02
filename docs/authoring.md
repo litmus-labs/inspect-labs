@@ -146,7 +146,7 @@ evaluator or make native logs safe for monitors/publication. Keep child files wi
 the evidence. Current links use absolute paths; arbitrary relocation requires
 explicit rebinding and is not automatically supported.
 
-For a custom task, supply its trusted judge explicitly:
+For a custom task, supply its trusted lab scorer explicitly:
 
 ```python
 from pathlib import Path
@@ -160,7 +160,7 @@ rescore_workflow(Path("run.eval"), Path("run.labs"),
 Replay constructs no environment and dispatches no provider, robot or model actions.
 It verifies parent and listed child hashes, task/sample identity, and task-owned
 required provenance. The original files remain unchanged. Evidence never names an
-arbitrary Python module for automatic import; the caller selects the judge.
+arbitrary Python module for automatic import; the caller selects the scorer.
 
 Native automatic retries can repeat side effects. A local admission marker keyed
 by Inspect's stable task/sample/epoch identity rejects another attempt before

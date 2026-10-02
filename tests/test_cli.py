@@ -173,15 +173,19 @@ def _rescore(native: Path, evidence: Path, output: Path, *extra: str):
     )
 
 
-def test_cli_rescores_a_custom_task_with_an_explicit_judge(tmp_path: Path) -> None:
+def test_cli_rescores_a_custom_task_with_an_explicit_scorer(tmp_path: Path) -> None:
     from inspect_ai.log import read_eval_log
 
     native, evidence = _custom_run(tmp_path)
     example = Path(__file__).resolve().parents[1] / "examples" / "reagent_addition.py"
     missing = _rescore(native, evidence, tmp_path / "a.eval")
-    assert missing.returncode == 2 and "--judge FILE.py:function" in missing.stderr
+    assert missing.returncode == 2 and "--scorer FILE.py:function" in missing.stderr
+    legacy = _rescore(
+        native, evidence, tmp_path / "legacy.eval", "--judge", f"{example}:reagent_outcome"
+    )
+    assert legacy.returncode == 0, legacy.stderr
     result = _rescore(
-        native, evidence, tmp_path / "b.eval", "--judge", f"{example}:reagent_outcome"
+        native, evidence, tmp_path / "b.eval", "--scorer", f"{example}:reagent_outcome"
     )
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == {
@@ -206,6 +210,6 @@ def test_cli_rescores_a_custom_task_with_an_explicit_judge(tmp_path: Path) -> No
 )
 def test_cli_judge_errors_are_clear(tmp_path: Path, spec: str, message: str) -> None:
     native, evidence = _custom_run(tmp_path)
-    result = _rescore(native, evidence, tmp_path / "x.eval", "--judge", spec)
+    result = _rescore(native, evidence, tmp_path / "x.eval", "--scorer", spec)
     assert result.returncode == 2 and message in result.stderr
     assert "Traceback" not in result.stderr

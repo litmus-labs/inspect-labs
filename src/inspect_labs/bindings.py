@@ -7,6 +7,7 @@ import logging
 import math
 import os
 import re
+import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -108,9 +109,31 @@ class WorkflowEvidence(BaseModel):
     samples: dict[str, LabEvidence]
 
 
+Readout = LabEvidence
+"""What the evaluator read from the Lab for one sample, independently of the agent."""
+
 EvidenceJudge = Callable[[str, LabEvidence], dict[str, int | float]]
-"""Pure outcome function. Return ``known=0`` only when facts could not be observed;
-an observed absence of work is a known, incorrect outcome."""
+"""Pure outcome function of the agent's report and the Readout. Return ``known=0``
+only when facts could not be observed; an observed absence of work is a known,
+incorrect outcome. Being pure lets the same function rescore saved evidence."""
+
+
+def _scorer_argument(
+    scorer: EvidenceJudge | None, judge: EvidenceJudge | None, where: str
+) -> EvidenceJudge:
+    """Resolve ``scorer`` and its deprecated ``judge`` alias to one function."""
+    if judge is not None:
+        if scorer is not None:
+            raise TypeError(f"{where}: pass scorer or judge, not both")
+        warnings.warn(
+            f"{where}(judge=...) is deprecated; pass scorer=... instead",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return judge
+    if scorer is None:
+        raise TypeError(f"{where}: missing required argument 'scorer'")
+    return scorer
 
 
 def artifact_digest(path: Path) -> str:
@@ -354,17 +377,21 @@ def _metric_keys(metrics: tuple[str, ...]) -> tuple[str, ...]:
     return metrics
 
 
-def evidence_scorer(
+def lab_scorer(
     judge: EvidenceJudge,
     evidence: dict[str, LabEvidence] | None = None,
     metrics: tuple[str, ...] = DEFAULT_METRICS,
 ) -> Scorer:
-    """Build a native scorer from a pure task-owned judge and private observations.
+    """Build a native Inspect scorer from a pure lab scoring function.
+
+    The function receives the agent's report and the Readout. An unknown outcome
+    (failed or empty observation) scores ``known=0`` with every other metric NaN,
+    without calling the function.
 
     Args:
-        judge: Pure report/evidence comparison, without provider or model access.
-        evidence: Persisted observations for replay; omitted during native execution.
-        metrics: Every key the judge may return. Unknown outcomes and omitted keys
+        judge: Pure report/Readout comparison, without provider or model access.
+        evidence: Persisted Readouts for replay; omitted during native execution.
+        metrics: Every key the function may return. Unknown outcomes and omitted keys
             are NaN (unscored), so every sample and epoch has the same keys.
 
     Returns:
@@ -395,7 +422,7 @@ def evidence_scorer(
             outcome = judge(state.output.completion, record)
             undeclared = set(outcome) - set(keys)
             if undeclared:
-                raise ValueError(f"Judge returned undeclared metrics: {sorted(undeclared)}")
+                raise ValueError(f"Scorer returned undeclared metrics: {sorted(undeclared)}")
             return Score(value={**unscored, **outcome})
 
         return assess
@@ -403,35 +430,43 @@ def evidence_scorer(
     return bound()
 
 
+evidence_scorer = lab_scorer
+"""Earlier name of `lab_scorer`."""
+
+
 def bind_task(
     task: Task,
     *,
     environment: Callable[[TaskState], LabEnvironment],
-    judge: EvidenceJudge,
+    scorer: EvidenceJudge | None = None,
     requires: frozenset[str] | Requirements,
     evidence_dir: Path,
     allow_physical: bool = False,
     observation_timeout: float = 30,
     metrics: tuple[str, ...] = DEFAULT_METRICS,
+    judge: EvidenceJudge | None = None,
 ) -> Task:
     """Attach lab tools/evidence to an existing native Task without replacing its solver.
 
     Args:
         task: Native Task containing the dataset, solver, approvals and budgets.
-        environment: Trusted factory returning a scoped provider client per native sample.
-        judge: Pure task-specific outcome function, also used for saved-evidence rescore.
+        environment: Trusted factory returning a Lab (scoped provider client) per sample.
+        scorer: Pure lab scoring function of the report and the Readout, installed as
+            a native Inspect scorer and reused unchanged for saved-evidence rescore.
         requires: Capabilities, or typed operation requirements, checked against the
             environment declaration before any actor dispatch.
         evidence_dir: Private directory retaining sample evidence even on failed runs.
         allow_physical: Host authorization for a physical provider; defaults to denied.
         observation_timeout: Bound for read-only provider observation, in seconds.
-        metrics: Every key the judge may return; must include known and correct.
+        metrics: Every key the scorer may return; must include known and correct.
+        judge: Deprecated alias of ``scorer``.
 
     Returns:
         The native Task, with setup, scorer and cleanup bindings installed.
 
     Raises:
         ValueError: The task already has a scorer; outcome ownership must be explicit.
+        TypeError: Neither or both of ``scorer`` and ``judge`` were passed.
 
     Samples raise ``CompatibilityError`` before dispatch when the environment does not
     satisfy ``requires`` or is physical without ``allow_physical``. A provider that sets
@@ -440,8 +475,9 @@ def bind_task(
     required = (
         requires if isinstance(requires, Requirements) else Requirements(capabilities=requires)
     )
+    outcome = _scorer_argument(scorer, judge, "bind_task")
     if task.scorer:
-        raise ValueError("Bind an unscored Task; the evidence judge owns the outcome")
+        raise ValueError("Bind an unscored Task; the lab scorer owns the outcome")
     keys = _metric_keys(metrics)
     if not math.isfinite(observation_timeout) or observation_timeout <= 0:
         raise ValueError("observation_timeout must be positive and finite")
@@ -518,7 +554,7 @@ def bind_task(
                     await previous_cleanup(state)
 
     task.setup = setup_lab()
-    task.scorer = [evidence_scorer(judge, metrics=keys)]
+    task.scorer = [lab_scorer(outcome, metrics=keys)]
     task.cleanup = cleanup
     return task
 
@@ -527,8 +563,10 @@ def rescore_workflow(
     native_log: Path,
     evidence_file: Path,
     output: Path,
-    judge: EvidenceJudge,
+    scorer: EvidenceJudge | None = None,
     metrics: tuple[str, ...] | None = None,
+    *,
+    judge: EvidenceJudge | None = None,
 ) -> None:
     """Rescore linked workflow evidence with no environment or robot construction.
 
@@ -536,13 +574,16 @@ def rescore_workflow(
         native_log: Original native Inspect artifact.
         evidence_file: Its private .labs companion (JSON content, not a native log).
         output: New native log destination; existing files are never overwritten.
-        judge: Explicit trusted pure outcome function, never imported from the artifact.
+        scorer: Explicit trusted lab scoring function, never imported from the artifact.
         metrics: Override the metric keys recorded in the evidence at bind time.
+        judge: Deprecated alias of ``scorer``.
 
     Raises:
         ValueError: The native or child artifacts do not match recorded provenance.
         OSError: Evidence is unavailable or the output already exists.
+        TypeError: Neither or both of ``scorer`` and ``judge`` were passed.
     """
+    outcome = _scorer_argument(scorer, judge, "rescore_workflow")
     bundle = WorkflowEvidence.model_validate_json(evidence_file.read_text())
     if artifact_digest(native_log) != bundle.native_sha256:
         raise ValueError("Native artifact hash mismatch")
@@ -571,7 +612,7 @@ def rescore_workflow(
         subset.eval.model_roles = None
         scored = score(
             subset,
-            evidence_scorer(judge, bundle.samples, metrics or bundle.metrics),
+            lab_scorer(outcome, bundle.samples, metrics or bundle.metrics),
             model="mockllm/model",
             action="overwrite",
             display="none",

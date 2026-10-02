@@ -278,7 +278,7 @@ def test_incompatible_volume_requirement_fails_before_dispatch(tmp_path: Path) -
     task = bind_task(
         Task(name="big-volume", dataset=[Sample(input="x")]),
         environment=build,
-        judge=worklist_outcome,
+        scorer=worklist_outcome,
         requires=needs,
         evidence_dir=tmp_path / "e",
     )
@@ -308,7 +308,7 @@ def test_real_backends_must_be_declared_physical_and_authorized(tmp_path: Path) 
         environment=lambda state: LiquidHandlingEnvironment(
             tmp_path / "b", LAYOUT, backend=BackendBinding(_Hardware(), "physical", "ot2")
         ),
-        judge=worklist_outcome,
+        scorer=worklist_outcome,
         requires=frozenset({"liquid_handling"}),
         evidence_dir=tmp_path / "e",
     )

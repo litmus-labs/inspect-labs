@@ -127,7 +127,7 @@ def absorbance_qc(
         environment=lambda state: PlateReaderEnvironment(
             state.uuid, directory / state.uuid, case=case
         ),
-        judge=qc_outcome,
+        scorer=qc_outcome,
         requires=frozenset({"plate_reading", "absorbance_qc"}),
         evidence_dir=directory,
         metrics=METRICS,

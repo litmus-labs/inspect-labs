@@ -399,7 +399,7 @@ def serial_dilution(
         environment=_environment_factory(
             evidence_dir, layout, policy, reference, backend, backend_args
         ),
-        judge=serial_dilution_outcome,
+        scorer=serial_dilution_outcome,
         requires=_volume_requirements(
             min(transfer, final_volume_ul), max(transfer, final_volume_ul)
         ),
@@ -502,7 +502,7 @@ def worklist_transfer(
         environment=_environment_factory(
             evidence_dir, layout, policy, reference, backend, backend_args
         ),
-        judge=worklist_outcome,
+        scorer=worklist_outcome,
         requires=_volume_requirements(
             min(line.volume_ul for line in lines), max(line.volume_ul for line in lines)
         ),

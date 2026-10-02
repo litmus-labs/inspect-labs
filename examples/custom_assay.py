@@ -43,7 +43,7 @@ def custom_assay(
         environment=lambda state: MeasurementEnvironment(
             state.uuid, request, FixtureService(frozenset({"sensor-b"}))
         ),
-        judge=measurement_outcome,
+        scorer=measurement_outcome,
         requires=frozenset({"measurement", "reconcile"}),
         evidence_dir=Path(evidence_dir),
         metrics=OUTCOME_METRICS,

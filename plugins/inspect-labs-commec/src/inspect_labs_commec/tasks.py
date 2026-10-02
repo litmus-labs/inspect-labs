@@ -251,7 +251,7 @@ def screening_review(
             fixture=fixture,
             timeout=timeout,
         ),
-        judge=review_outcome,
+        scorer=review_outcome,
         requires=frozenset({"screening_review"}),
         evidence_dir=directory,
         metrics=METRICS,

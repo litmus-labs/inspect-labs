@@ -134,7 +134,7 @@ def test_external_native_task_authoring(tmp_path: Path) -> None:
         environment=lambda state: MeasurementEnvironment(
             state.uuid, request, FixtureService(frozenset({"custom-sample"}))
         ),
-        judge=measurement_outcome,
+        scorer=measurement_outcome,
         requires=frozenset({"measurement"}),
         evidence_dir=tmp_path / "external-evidence",
         metrics=OUTCOME_METRICS,
@@ -206,7 +206,7 @@ def test_capability_preflight_prevents_actor_dispatch(tmp_path: Path) -> None:
             solver=scripted_measurement(request),
         ),
         environment=lambda state: Incompatible(state.uuid, request, service),
-        judge=measurement_outcome,
+        scorer=measurement_outcome,
         requires=frozenset({"measurement"}),
         evidence_dir=tmp_path / "evidence",
         metrics=OUTCOME_METRICS,
@@ -251,7 +251,7 @@ def test_observer_timeout_is_preserved_as_unknown(tmp_path: Path) -> None:
         environment=lambda state: SlowObserver(
             state.uuid, request, FixtureService(frozenset({"sample1"}))
         ),
-        judge=measurement_outcome,
+        scorer=measurement_outcome,
         requires=frozenset({"measurement"}),
         evidence_dir=tmp_path / "evidence",
         metrics=OUTCOME_METRICS,
@@ -445,7 +445,7 @@ def test_unknown_epoch_is_unscored_not_dropped(tmp_path: Path) -> None:
         environment=lambda state: FlakyObserver(
             state.uuid, request, FixtureService(frozenset({"sample1"}))
         ),
-        judge=measurement_outcome,
+        scorer=measurement_outcome,
         requires=frozenset({"measurement"}),
         evidence_dir=tmp_path / "evidence",
         metrics=OUTCOME_METRICS,
@@ -516,7 +516,7 @@ def test_rejected_native_retry_closes_provider_once(tmp_path: Path) -> None:
         environment=lambda state: Counted(
             state.uuid, request, FixtureService(frozenset({"sample1"}))
         ),
-        judge=measurement_outcome,
+        scorer=measurement_outcome,
         requires=frozenset({"measurement"}),
         evidence_dir=tmp_path / "evidence",
         metrics=OUTCOME_METRICS,
@@ -567,7 +567,7 @@ def test_declared_extra_metrics_survive_unknown_epochs(tmp_path: Path) -> None:
             environment=lambda state: FlakyObserver(
                 state.uuid, request, FixtureService(frozenset({"sample1"}))
             ),
-            judge=judge,
+            scorer=judge,
             requires=frozenset({"measurement"}),
             evidence_dir=tmp_path / str(len(metrics)),
             metrics=metrics,
@@ -632,3 +632,35 @@ def test_limit_before_answer_is_unanswered_not_dishonest(tmp_path: Path) -> None
     assert sample.limit is not None and sample.limit.type == "message"
     result = next(iter(sample.scores.values())).value
     assert result["answered"] == 0 and unscored(result["honest"]) and result["correct"] == 0
+
+
+def test_judge_keyword_is_a_deprecated_alias_of_scorer(tmp_path: Path) -> None:
+    request = Request(resource="custom-sample", request_id="alias", values=(1, 2))
+
+    def build(**outcome):
+        return bind_task(
+            Task(name="alias", dataset=[Sample(input="m")], solver=scripted_measurement(request)),
+            environment=lambda state: MeasurementEnvironment(
+                state.uuid, request, FixtureService(frozenset({"custom-sample"}))
+            ),
+            requires=frozenset({"measurement"}),
+            evidence_dir=tmp_path / "alias-evidence",
+            metrics=OUTCOME_METRICS,
+            **outcome,
+        )
+
+    with pytest.warns(DeprecationWarning, match="scorer="):
+        task = build(judge=measurement_outcome)
+    log = run_task(task, tmp_path)
+    assert next(iter(log.samples[0].scores.values())).value == SUCCESS
+    with pytest.warns(DeprecationWarning, match="scorer="):
+        rescore_workflow(
+            Path(log.location),
+            Path(log.location).with_suffix(".labs"),
+            tmp_path / "alias-rescored.eval",
+            judge=measurement_outcome,
+        )
+    with pytest.raises(TypeError, match="not both"):
+        build(scorer=measurement_outcome, judge=measurement_outcome)
+    with pytest.raises(TypeError, match="missing required argument 'scorer'"):
+        build()

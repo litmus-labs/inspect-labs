@@ -1,6 +1,6 @@
 ---
 title: "Author a laboratory evaluation"
-description: "Bind a native Inspect task to scoped tools, observations and a pure outcome judge."
+description: "Bind a native Inspect task to a Lab, its Readout and a pure lab scorer."
 ---
 
 Write the Inspect task first. Define the question, sample inputs, agent scaffold,
@@ -64,7 +64,7 @@ evaluation = bind_task(
     environment=lambda state: MeasurementEnvironment(
         state.uuid, request, FixtureService(frozenset({"sensor-b"}))
     ),
-    judge=measurement_outcome,
+    scorer=measurement_outcome,
     requires=frozenset({"measurement", "reconcile"}),
     evidence_dir=Path(".research/custom-evidence"),
     metrics=OUTCOME_METRICS,
@@ -74,10 +74,11 @@ evaluation = bind_task(
 This excerpt is a binding recipe, not a standalone task. The complete runnable
 definition is `examples/custom_assay.py` in the checkout.
 
-## Define a judge
+## Define a lab scorer
 
-A judge accepts `(report: str, evidence: LabEvidence)` and returns numeric metrics.
-It must be pure so it can run on saved evidence later. Validate the observation
+A lab scorer accepts `(report: str, readout: Readout)` and returns numeric metrics.
+Inspect Labs installs it as a native Inspect scorer. It must be pure so the same
+function can rescore saved evidence later. Validate the observation
 schema, provenance and required child records before judging correctness.
 
 Declare every returned metric in `bind_task(..., metrics=(...))`, including `known`
