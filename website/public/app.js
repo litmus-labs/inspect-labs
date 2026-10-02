@@ -48,6 +48,34 @@ for (const input of document.querySelectorAll('input[name="scenario"]')) {
       document.getElementById(id).textContent = cases[input.value][key];
   });
 }
+const story = document.querySelector(".system-story");
+if (story) {
+  const steps = [...story.querySelectorAll(".story-step")];
+  let scheduled = false;
+  const updateStory = () => {
+    const focus = window.innerHeight * 0.45;
+    const current = steps.reduce(
+      (nearest, step) => {
+        const bounds = step.getBoundingClientRect();
+        const distance = Math.abs(bounds.top + bounds.height / 2 - focus);
+        return distance < nearest.distance
+          ? { step: step.dataset.step, distance }
+          : nearest;
+      },
+      { step: "1", distance: Infinity },
+    );
+    story.dataset.activeStep = current.step;
+    scheduled = false;
+  };
+  const scheduleStoryUpdate = () => {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(updateStory);
+  };
+  window.addEventListener("scroll", scheduleStoryUpdate, { passive: true });
+  window.addEventListener("resize", scheduleStoryUpdate);
+  scheduleStoryUpdate();
+}
 document.getElementById("copy-code").addEventListener("click", async () => {
   const status = document.getElementById("copy-status");
   try {

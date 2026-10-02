@@ -8,7 +8,7 @@
       name="description"
       content="Build reusable laboratory environments on Inspect AI to evaluate scientific agents and safeguards across biological software, laboratory services and robots."
     />
-    <meta name="theme-color" content="#f7f7f2" />
+    <meta name="theme-color" content="#f8f8f4" />
     <link rel="icon" href="/assets/favicon.svg" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
@@ -16,20 +16,19 @@
     {{HEADER}}
     <main id="main">
       <section class="hero wrap">
-        <div>
-          <p class="eyebrow">A framework built on Inspect AI</p>
+        <div class="hero-copy">
+          <p class="eyebrow">Litmus / Inspect Labs</p>
           <h1>
             Evaluate <span class="nowrap">AI-operated</span> laboratory
             workflows.
           </h1>
           <p class="lede">
-            Inspect Labs is a framework built on Inspect AI to test and evaluate
-            capabilities and safety of agents in autonomous lab workflows.
+            A framework built on Inspect AI to test and evaluate capabilities
+            and safety of agents in autonomous lab workflows.
           </p>
-          <p>
-            From biological software to laboratory services and robots. Inspect
-            AI runs the evaluation. Inspect Labs connects the laboratory and
-            records its outcomes.
+          <p class="hero-explanation">
+            Inspect Labs records what an agent requests, what safeguards allow,
+            and what the lab environment shows after an action.
           </p>
           <div class="actions">
             <a class="button" href="{{DOCS_URL}}/quickstart"
@@ -38,51 +37,47 @@
               >Read the paper <span aria-hidden="true">↗</span></a
             >
           </div>
-          <p class="small status">
-            <span class="dot" aria-hidden="true"></span>Early prototype.
-            Robotics is central to our physical laboratory mission.
-          </p>
         </div>
-        <figure class="hero-figure">
-          <div class="figure-heading">
+        <figure class="hero-ledger">
+          <div class="ledger-header">
             <p class="eyebrow">One laboratory evaluation</p>
-            <span class="figure-number" aria-hidden="true">01</span>
+            <span>Illustrative case</span>
           </div>
-          <div class="flow-node">
-            <span class="small">Native evaluation</span
-            ><strong>Inspect AI</strong
-            ><span>Task · Agent · Tools · Scoring</span>
-          </div>
-          <div class="flow-paths">
-            <span>Tool calls <b aria-hidden="true">↓</b></span>
-            <span><b aria-hidden="true">↑</b> Outcome evidence</span>
-          </div>
-          <div class="flow-node labs">
-            <span class="small">Laboratory connection</span
-            ><strong>Inspect Labs</strong>
-            <div class="lab-functions">
-              <span>Scoped environment tools</span>
-              <span>Independent observations</span>
+          <div class="ledger-steps">
+            <div class="ledger-step">
+              <span class="ledger-number">01 / Agent report</span>
+              <strong>“The measurement completed.”</strong>
+              <small>What the agent says</small>
+            </div>
+            <div class="ledger-step">
+              <span class="ledger-number">02 / Safeguard decision</span>
+              <strong>Request allowed.</strong>
+              <small>What the safeguard permits</small>
+            </div>
+            <div class="ledger-step observed">
+              <span class="ledger-number">03 / Environment record</span>
+              <strong>Job state: completed.</strong>
+              <small>What the laboratory shows</small>
             </div>
           </div>
-          <div class="flow-paths">
-            <span>Requests <b aria-hidden="true">↓</b></span>
-            <span><b aria-hidden="true">↑</b> Observations</span>
-          </div>
-          <div class="flow-environments">
-            <div><strong>Software</strong><span>Research tools</span></div>
-            <div><strong>Services</strong><span>Jobs and results</span></div>
-            <div><strong>Robots</strong><span>Inspect Robots</span></div>
+          <div class="ledger-footer">
+            <p>
+              Inspect AI runs the evaluation. Inspect Labs connects laboratory
+              observations to the task so the report can be checked.
+            </p>
+            <a href="#examples"
+              >Explore the evidence <span aria-hidden="true">↗</span></a
+            >
           </div>
           <figcaption>
-            Existing systems execute the work. Inspect Labs connects their
-            observations to the task, so a report can be checked against what
-            happened.
+            This is an illustrative example, not a model result. No model,
+            service or robot runs on this page.
           </figcaption>
-          <a class="figure-link" href="#examples"
-            >Explore an outcome <span aria-hidden="true">↓</span></a
-          >
         </figure>
+        <p class="small hero-status">
+          <span class="dot" aria-hidden="true"></span>Early prototype. Robotics
+          is central to our physical laboratory mission.
+        </p>
       </section>
       <nav class="page-index wrap" aria-label="On this page">
         <a href="#examples"
@@ -216,43 +211,88 @@
       <section class="wrap section" id="how-it-works">
         <p class="eyebrow">A laboratory layer for Inspect AI</p>
         <h2>Keep the evaluation native.<br />Connect the laboratory.</h2>
-        <div class="responsibilities">
-          <div>
-            <h3>Inspect AI runs the task.</h3>
-            <p>
-              Use its models, agents, tools, approvals, limits, scoring and
-              logs. Inspect Labs evaluations are normal Inspect tasks.
-            </p>
+        <p class="section-lede">
+          Inspect Labs connects the agent's actions to observations from the
+          systems that carry out the work. Follow the path from task to outcome.
+        </p>
+        <div class="system-story" data-active-step="1">
+          <div class="story-steps">
+            <article class="story-step" data-step="1">
+              <span class="story-number">01 / Evaluate</span>
+              <h3>Inspect AI runs the task.</h3>
+              <p>
+                A researcher defines the task and agent in Inspect AI. Its
+                models, tools, approvals, limits, scoring and logs remain the
+                evaluation substrate.
+              </p>
+            </article>
+            <article class="story-step" data-step="2">
+              <span class="story-number">02 / Connect</span>
+              <h3>Inspect Labs connects the laboratory.</h3>
+              <p>
+                Scoped tools let the agent request work. The environment checks
+                requirements before dispatch and records the request and
+                safeguard decision.
+              </p>
+            </article>
+            <article class="story-step" data-step="3">
+              <span class="story-number">03 / Observe</span>
+              <h3>The system records what happened.</h3>
+              <p>
+                Services and instrument stacks retain execution. For robot
+                policies, Inspect Robots runs the trial and keeps its native
+                record. Inspect Labs links those observations to the task.
+              </p>
+            </article>
+            <article class="story-step" data-step="4">
+              <span class="story-number">04 / Judge</span>
+              <h3>Score the observed outcome.</h3>
+              <p>
+                Compare the agent's report with independent records. If the
+                records are missing, the outcome stays unknown. A completed
+                evaluation can be rescored without submitting new actions.
+              </p>
+            </article>
           </div>
-          <div>
-            <h3>Inspect Labs binds the environment.</h3>
-            <p>
-              Expose scoped laboratory tools, check declared requirements before
-              dispatch and collect observations for judging outcomes.
-            </p>
-          </div>
-          <div>
-            <h3>Lab systems execute the work.</h3>
-            <p>
-              Instrument stacks and services retain execution. Inspect Robots
-              runs robot policies and keeps their native trial records.
-            </p>
-          </div>
+          <figure class="story-stage">
+            <div class="stage-header">
+              <span>Inspect Labs / How an evaluation works</span>
+              <span aria-hidden="true">01—04</span>
+            </div>
+            <div class="stage-row" data-stage-step="1">
+              <span class="stage-index">01</span>
+              <div>
+                <strong>Inspect AI</strong>
+                <small>Task · agent · approvals · scoring · logs</small>
+              </div>
+            </div>
+            <div class="stage-row" data-stage-step="2">
+              <span class="stage-index">02</span>
+              <div>
+                <strong>Inspect Labs</strong>
+                <small>Scoped tools · request · safeguard decision</small>
+              </div>
+            </div>
+            <div class="stage-row" data-stage-step="3">
+              <span class="stage-index">03</span>
+              <div>
+                <strong>Laboratory systems</strong>
+                <small>Services · simulations · Inspect Robots trials</small>
+              </div>
+            </div>
+            <div class="stage-row" data-stage-step="4">
+              <span class="stage-index">04</span>
+              <div>
+                <strong>Observed outcome</strong>
+                <small>Linked evidence · known or unknown · replay</small>
+              </div>
+            </div>
+            <figcaption>
+              Requests travel to the lab. Observations return from the system
+              that executed the work, not from the agent's report.
+            </figcaption>
+          </figure>
         </div>
-        <figure class="wide-figure">
-          <img
-            src="/assets/architecture.svg"
-            width="1080"
-            height="510"
-            loading="lazy"
-            alt="Inspect AI runs a laboratory task through Inspect Labs environment tools. Laboratory services, simulations and native robot trials provide separate observations to the evaluator."
-          />
-          <figcaption>
-            Agent activity and outcome observations follow separate paths.
-            Linked evidence lets completed evaluations be rescored without
-            submitting new actions.
-          </figcaption>
-        </figure>
       </section>
       <section class="wrap section" id="start">
         <div class="section-intro">
