@@ -1,11 +1,11 @@
 ---
 title: "How an evaluation works"
-description: "A native Inspect task, a laboratory binding and separately observed outcomes."
+description: "A native Inspect task, a Lab, and a Readout of what actually happened."
 ---
 
 Start with a research question and a normal Inspect AI `Task`. Its sample states a
 goal, its agent acts through tools, and its scorer judges the outcome. Inspect Labs
-adds a laboratory environment and the observations needed to judge that work.
+adds a **Lab**, where the lab work happens, and a **Readout** of what happened there.
 
 ## Two inputs
 
@@ -14,9 +14,29 @@ The agent and laboratory can change independently.
 **The agent** is an Inspect model and solver or agent scaffold. Native `--model` and
 `--solver` options change these without replacing the task.
 
-**The laboratory** implements `LabEnvironment`. It provides scoped tools, declares
-capabilities and operations, and reads observations through `observe()`. Its existing
-provider or instrument stack continues to own execution and durable state.
+**The Lab** implements the `LabEnvironment` protocol. It provides scoped tools,
+declares capabilities and operations, and returns the Readout through `observe()`.
+Its existing provider or instrument stack continues to own execution and durable
+state. Labs are selected by name and swapped without changing the task, the way
+Inspect AI sandboxes are.
+
+## Vocabulary
+
+Inspect Labs keeps Inspect AI's words (Task, Sample, Solver, Tool, Scorer, Approver,
+eval log) and adds a few for what Inspect does not cover.
+
+| Word | Meaning | Status |
+|---|---|---|
+| **Lab** | Where lab work happens: a simulator, a mock instrument, later real instruments | Built |
+| **Readout** | What the evaluator read from the Lab, independently of the agent | Built |
+| **Lab scorer** | A pure function of the agent's report and the Readout, installed as a native Inspect scorer and reused for rescoring | Built |
+| **Outcome** | Completed, not completed or unknown. Unknown is never counted as success or failure. | Built |
+| **Lab log** | The `.labs` file saved next to the eval log, so the run can be rescored later | Built |
+| **Fidelity** | Whether a result came from a simulator, a digital twin or real hardware | Planned |
+| **Action type** | Whether an operation only reads, can be undone, cannot be undone, or leaves the lab | Planned |
+
+Inside adapters, Inspect Labs uses the nouns lab standards already define, such as
+PyLabRobot's deck, labware and well, and SiLA 2's feature, command and property.
 
 ## Evaluation sequence
 
@@ -27,7 +47,7 @@ provider or instrument stack continues to own execution and durable state.
    remain separate controls.
 4. The binding collects read-only observations at scoring and cleanup, including
    early exits. Observation failures are recorded as unknown.
-5. A pure judge compares the agent's report with the observations and reference.
+5. A pure lab scorer compares the agent's report with the Readout and reference.
 6. A completed native run can seal linked evidence for later rescoring.
 
 Construction, observation and closing must not secretly submit work. Closing a client
@@ -45,7 +65,7 @@ A successful observation of an idle or refused agent is a known non-completion. 
 missing observation is unknown. To make this distinction, an environment must establish
 that the relevant provider records are complete.
 
-Invalid evidence is a separate failure. A task judge can reject malformed payloads
+Invalid evidence is a separate failure. A lab scorer can reject malformed payloads
 or conflicting provenance with a native sample error. Replay rejects mismatched
 records rather than replacing them with unknown scores.
 
@@ -64,4 +84,4 @@ Inspect AI task. Inspect Robots owns the policy, embodiment, trial execution and
 metrics. Inspect Labs judges their significance for the laboratory workflow.
 
 The bridge is implemented. Physical laboratory validation and evaluation of a robot
-foundation model remain future work. [Environment guide](environments.qmd).
+foundation model remain future work. [Labs guide](labs.qmd).

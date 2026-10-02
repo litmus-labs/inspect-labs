@@ -26,8 +26,8 @@ website:
     left:
       - text: "User Guide"
         href: index.qmd
-      - text: "Environments"
-        href: environments.qmd
+      - text: "Labs"
+        href: labs.qmd
       - text: "Reference"
         href: reference.qmd
       - text: "Research"
@@ -52,12 +52,12 @@ website:
           contents:
             - authoring.qmd
             - evidence.qmd
-    - id: environments
-      title: "Environments"
+    - id: labs
+      title: "Labs"
       contents:
-        - section: "Environments"
+        - section: "Labs"
           contents:
-            - environments.qmd
+            - labs.qmd
     - id: reference
       title: "Reference"
       contents:

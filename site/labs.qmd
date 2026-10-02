@@ -1,17 +1,22 @@
 ---
-title: "Environments and plugins"
-description: "What you can evaluate today, what each environment observes, and what it does not establish."
+title: "Labs"
+description: "The Labs you can evaluate in today, what each one reads back, and what it does not establish."
 ---
 
-An environment gives an agent scoped tools and gives the evaluator an independent
-record. Current environments are building blocks: a meaningful study also needs
-domain-reviewed tasks, legitimate controls and valid outcome measures.
+A **Lab** is where laboratory work happens in an evaluation: a simulator, a mock
+instrument, and later real instruments. It gives the agent scoped tools and gives
+the evaluator a separate **Readout** of what happened. Labs are selected by name and
+swapped without changing the task, the way Inspect AI sandboxes are.
 
-| Environment | Native task | Mode |
+Current Labs are building blocks: a meaningful study also needs domain-reviewed
+tasks, legitimate controls and valid outcome measures.
+
+| Lab | Native task | Mode |
 |-------------|-------------|------|
 | [Liquid handling](#liquid-handling) | `inspect_labs/serial_dilution`, `inspect_labs/worklist_transfer` | [Simulation]{.state .neutral} |
 | [Measurement and report services](#measurement-and-report-services) | `inspect_labs/measurement`, `inspect_labs/handoff` | [Synthetic]{.state .neutral} |
 | [Plate-reader QC](#plate-reader-qc) | `inspect_labs_plate_reader/absorbance_qc` | [Synthetic]{.state .neutral} |
+| [SiLA 2 instrument](#sila-2-instrument) | `inspect_labs_sila/absorbance_read` | [Mock instrument]{.state .neutral} |
 | [Screening review](#screening-review) | `inspect_labs_commec/screening_review` | [Gate pending]{.state .unknown} |
 | [Robot steps](#robot-steps) | `inspect_labs/robot_step` | [Software controls]{.state .neutral} |
 
@@ -20,7 +25,7 @@ Each scripted control below runs from an installed checkout without model creden
 ## Liquid handling
 
 An agent plans and runs pipetting work on a [PyLabRobot](https://docs.pylabrobot.org/)
-deck. The judge reads the deck, not the agent's account of it.
+deck. The lab scorer reads the deck, not the agent's account of it.
 
 Observations
 : Deck state, volumes, concentrations, tip use and restricted-well events
@@ -67,6 +72,25 @@ inspect eval inspect_labs_plate_reader/absorbance_qc \
   --model mockllm/model -T scripted=true
 ```
 
+## SiLA 2 instrument
+
+A mock absorbance reader that speaks [SiLA 2](https://sila-standard.com/), the open
+standard many lab instruments use to expose commands. The agent's tool calls the
+instrument's `ReadWell` command over SiLA 2. The evaluator reads the instrument's own
+run log through a separate channel. Requires the `plugins/inspect-labs-sila` plugin.
+
+Readout
+: The instrument's run log: every executed command, with the well and value
+
+Limits
+: Seeded synthetic values on a local mock server. No real instrument has been
+  connected, and the mock does not simulate optics or an assay.
+
+```bash
+inspect eval inspect_labs_sila/absorbance_read \
+  --model mockllm/model -T scripted=true
+```
+
 ## Screening review
 
 A bounded review of a sequence-screening result using IBBIS's open-source Common
@@ -107,7 +131,7 @@ Environments and instrument backends are plugins discovered by name:
 
 ```bash
 inspect-labs list
-inspect-labs doctor --environment liquid-handler
+inspect-labs doctor --lab liquid-handler
 ```
 
 `doctor` checks declarations and requirements without constructing providers or
@@ -122,13 +146,15 @@ Install plugins from the checkout into the same Python environment:
 uv pip install --python .venv/bin/python \
   ./plugins/inspect-labs-opentrons \
   ./plugins/inspect-labs-plate-reader \
-  ./plugins/inspect-labs-commec
+  ./plugins/inspect-labs-commec \
+  ./plugins/inspect-labs-sila
 ```
 
 | Plugin | Provides | Current limits |
 |--------|----------|----------------|
 | Opentrons | OT-2 backend declarations and a simulator | Simulator mechanics do not establish hardware compatibility |
 | Plate reader | Native absorbance QC task through PyLabRobot's device-free reader API | Seeded synthetic values, no validated assay or physical reader |
+| SiLA 2 | A Lab backed by a mock SiLA 2 instrument; Readout from the instrument's run log | Local mock with seeded values; no real instrument connected |
 | Common Mechanism | Bounded screening review with IBBIS Commec and a simulated disposition service | Fixture mechanics verified; full-reference runtime gate pending; no real order fulfillment |
 
 Each plugin directory includes its own README, controls and tests.
@@ -154,8 +180,9 @@ participating evaluations on one host.
 
 ## Publish a plugin
 
-Packages register environments and backends using the Python entry-point groups
-`inspect_labs.environments` and `inspect_labs.backends`. Declare runtime requirements,
+Packages register Labs and backends using the Python entry-point groups
+`inspect_labs.labs` and `inspect_labs.backends`. The earlier `inspect_labs.environments`
+group is still read. Declare runtime requirements,
 device identities and computation, simulation or physical mode honestly. Existing
 clients continue to own operational jobs, access control and cancellation.
 

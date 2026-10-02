@@ -1,26 +1,34 @@
 # Inspect Labs
 
-**Inspect AI evaluations for agents that operate laboratory workflows.**
+**The Inspect AI for laboratory workflows.**
 
-Inspect Labs aims to provide shared evaluation infrastructure for testing
-scientific agents and safeguards across biological software, laboratory
-services and robots. Our first priority is to help researchers test whether
-safeguards prevent biological misuse in practice while allowing legitimate
-research. Robotics is central to extending this work into physical laboratories.
-See the [vision and development path](docs/vision.md).
+Inspect Labs is a framework built on Inspect AI to test and evaluate capabilities
+and safety of agents in autonomous lab workflows. Our first priority is to help
+researchers test whether safeguards prevent biological misuse in practice while
+allowing legitimate research. Robotics is central to extending this work into
+physical laboratories. See the [vision and development path](docs/vision.md).
 
 Write a normal Inspect AI task, choose a model or agent, and let Inspect run it.
-Inspect Labs binds that task to a laboratory service, instrument or simulator,
-checks whether the environment supports the task before dispatch, and scores
-what was observed rather than what the agent claims. Completed native runs with
-saved, linked evidence can be rescored without touching an instrument.
+Inspect Labs binds that task to a **Lab**: a laboratory service, instrument or
+simulator. It checks whether the Lab supports the task before anything runs, and
+scores what the Lab recorded rather than what the agent claims. Saved evidence can
+be rescored later without touching an instrument.
 
-Litmus is the organization; Inspect Labs is the framework; Litmus Labs names the
-environments. Inspect AI owns models, solvers, approvals, limits, logs, scoring
-and `inspect view`. When a workflow has a robot step, Inspect Robots owns that
-policy rollout and its log; lab stacks such as PyLabRobot own instruments.
-Inspect Labs connects their evidence to the laboratory task without replacing
-their execution. Start with [concepts](docs/concepts.md).
+If you know Inspect AI, you already know most of Inspect Labs:
+
+| Inspect AI | Inspect Robots | Inspect Labs |
+|---|---|---|
+| Task, Sample, Solver, Tool, Scorer, Approver, eval log | Same names | The same Inspect AI objects, unchanged |
+| Sandbox: where code runs | Embodiment: the robot or simulator | **Lab**: where lab work happens (a simulator, a mock SiLA 2 instrument, later real instruments) |
+| Scorer reads the transcript | Scorer reads the trial record | **Lab scorer** reads the **Readout**: what the evaluator read from the Lab |
+| `inspect_evals` | WorldEvals | **Litmus Labs**: the Labs and evals Litmus maintains |
+
+Inspect Labs runs on native Inspect AI, so a lab eval is an ordinary Inspect task:
+Inspect's model providers, approvals, limits and log viewer work unchanged. When a
+workflow has a robot step, Inspect Robots owns that policy rollout and its log; lab
+stacks such as PyLabRobot and SiLA 2 own instruments. Inspect Labs connects their
+records to the laboratory task without replacing their execution. Litmus is the
+organization that maintains it. Start with [concepts](docs/concepts.md).
 
 ## Install
 

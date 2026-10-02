@@ -49,13 +49,13 @@ inspect-labs rescore path/to/run.eval \
   --output path/to/run.rescored.eval
 ```
 
-Use a new output file. The CLI selects a trusted judge for supported reference tasks.
+Use a new output file. The CLI selects a trusted lab scorer for supported reference tasks.
 It verifies identities and links and writes a new native log. It never constructs an
 environment, calls a model or dispatches a provider or robot action.
 
 ## Rescore a custom task
 
-Supply its trusted pure judge explicitly:
+Supply its trusted lab scorer explicitly:
 
 ```python
 from pathlib import Path
@@ -70,7 +70,7 @@ rescore_workflow(
 )
 ```
 
-Replace `measurement_outcome` with your task's judge. The caller selects it; evidence
+Replace `measurement_outcome` with your task's lab scorer. The caller selects it; evidence
 does not name arbitrary Python modules to import. Samples that errored in the native
 run remain unscored in replay.
 

@@ -59,7 +59,7 @@ replay, not another runner.
 ```bash
 inspect-labs --help
 inspect-labs list
-inspect-labs doctor --environment litmus-measurement
+inspect-labs doctor --lab litmus-measurement
 inspect-labs run --task measurement --scripted
 inspect-labs rescore run.eval --evidence run.labs --output replay.eval
 ```

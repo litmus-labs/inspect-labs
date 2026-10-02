@@ -95,7 +95,7 @@ def test_adapter_declarations_load() -> None:
 
 ```bash
 inspect-labs doctor --backend my-handler
-inspect-labs doctor --environment my-lims
+inspect-labs doctor --lab my-lims
 ```
 
 `doctor` reports:

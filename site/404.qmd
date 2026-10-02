@@ -8,5 +8,5 @@ This page does not exist. It may have moved when the documentation was reorganiz
 
 - [Welcome](/index.html)
 - [Quickstart](/quickstart.html)
-- [Environments](/environments.html)
+- [Labs](/labs.html)
 - Or use the search in the navigation bar.

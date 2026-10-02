@@ -50,5 +50,17 @@
         }
       ]
     }
+  ],
+  "redirects": [
+    {
+      "source": "/environments",
+      "destination": "/labs",
+      "permanent": true
+    },
+    {
+      "source": "/environments.html",
+      "destination": "/labs",
+      "permanent": true
+    }
   ]
 }

@@ -1,21 +1,35 @@
 ---
 title: "Inspect Labs"
-description: "Inspect Labs connects Inspect AI tasks to laboratory tools and to independent records of what happened, so an agent's report can be checked against the laboratory."
+description: "The Inspect AI for laboratory workflows: a framework built on Inspect AI to test and evaluate capabilities and safety of agents in autonomous lab workflows."
 toc: true
 code-annotations: below
 ---
 
 ## Welcome
 
-Welcome to Inspect Labs, an extension of [Inspect AI](https://inspect.aisi.org.uk/)
-for evaluating AI-operated laboratory workflows, maintained by Litmus. It connects a native Inspect task to
-laboratory tools and to separately collected records of what happened, so you can
-check an agent's report against the laboratory rather than its own account.
+Welcome to Inspect Labs, **the Inspect AI for laboratory workflows**. It is a
+framework built on [Inspect AI](https://inspect.aisi.org.uk/) to test and evaluate
+capabilities and safety of agents in autonomous lab workflows, maintained by Litmus.
+It connects a native Inspect task to a **Lab** and reads back what actually
+happened, so you can check an agent's report against the laboratory rather than its
+own account.
 
 Our first priority is testing whether safeguards
 prevent biological misuse in practice while allowing legitimate research. Robotics,
 through [Inspect Robots](https://github.com/robocurve/inspect-robots), is central to
 extending these evaluations into physical laboratories.
+
+If you know Inspect AI, you already know most of Inspect Labs:
+
+| Inspect AI | Inspect Robots | Inspect Labs |
+|---|---|---|
+| Task, Sample, Solver, Tool, Scorer, Approver, eval log | Same names | The same Inspect AI objects, unchanged |
+| Sandbox: where code runs | Embodiment: the robot or simulator | **Lab**: where lab work happens (a simulator, a mock SiLA 2 instrument, later real instruments) |
+| Scorer reads the transcript | Scorer reads the trial record | **Lab scorer** reads the **Readout**: what the evaluator read from the Lab |
+| `inspect_evals` | WorldEvals | **Litmus Labs**: the Labs and evals Litmus maintains |
+
+Inspect Labs runs on native Inspect AI, so a lab eval is an ordinary Inspect task.
+Inspect's model providers, approvals, limits and log viewer work unchanged.
 
 ::: {.callout-warning}
 ## Early prototype
@@ -73,7 +87,7 @@ the agent's transcript, so Inspect Labs keeps three things separate:
 2. **Independent records.** Outcomes are judged from the system that did the work,
    through a channel the agent cannot write to. Missing observations stay unknown.
 3. **Rescoring without dispatch.** Saved records are linked to the native log by
-   hash. A judge can be changed and re-applied without calling a model or touching
+   hash. A scorer can be changed and re-applied without calling a model or touching
    the laboratory.
 
 <figure aria-labelledby="fig1-caption">
@@ -82,7 +96,7 @@ the agent's transcript, so Inspect Labs keeps three things separate:
 <li><strong>Scoped laboratory tools<span class="owner">Inspect Labs</span></strong><span>Requirements are checked before the agent can act.</span></li>
 <li><strong>The system that does the work<span class="owner">Your stack</span></strong><span>A service, instrument stack, simulator or Inspect Robots trial.</span></li>
 <li><strong>Independent record<span class="owner">Inspect Labs</span></strong><span>Collected from that system, linked to the log by hash.</span></li>
-<li><strong>Outcome<span class="owner">Your judge</span></strong><span><span class="state observed">Known</span> when observed, <span class="state unknown">Unknown</span> when not.</span></li>
+<li><strong>Outcome<span class="owner">Your lab scorer</span></strong><span><span class="state observed">Known</span> when observed, <span class="state unknown">Unknown</span> when not.</span></li>
 </ol>
 <figcaption id="fig1-caption">Fig. 1. Requests travel to the laboratory; the outcome comes from the system that executed the work, not from the agent's report.</figcaption>
 </figure>
@@ -108,8 +122,8 @@ Quickstart, and so on) so coding assistants can read the documentation directly.
 ::: {.cards}
 [**Quickstart**Run a control, modify a task and rescore saved evidence.](quickstart.qmd)
 [**How an evaluation works**The two inputs, the evaluation sequence and observed outcomes.](concepts.qmd)
-[**Author an evaluation**Bind a native task to scoped tools and a pure judge.](authoring.qmd)
-[**Environments**What you can evaluate today, and what it does not establish.](environments.qmd)
+[**Author an evaluation**Bind a native task to a Lab and a pure lab scorer.](authoring.qmd)
+[**Labs**What you can evaluate in today, and what each one does not establish.](labs.qmd)
 [**Evidence and replay**The `.labs` companion, its limits and how to rescore.](evidence.qmd)
 [**Research**Why Litmus builds this, and the evidence each stage requires.](research.qmd)
 [**Framework paper**The SPAIS 2026 submission describing the approach and prototype.](paper.qmd)
