@@ -1,0 +1,118 @@
+---
+title: "Research program"
+description: "Why Litmus builds Inspect Labs: testing whether safeguards prevent biological misuse in practice, the studies it aims to support, and the evidence each stage requires."
+---
+
+Model capabilities in biology are accelerating, and scientific AI agents with access
+to biological tools and lab equipment are becoming integrated into physical R&D
+workflows. Ensuring that safeguards reliably prevent misuse in practice is an urgent
+R&D challenge.
+
+[Read the framework paper](paper.qmd){.btn .btn-primary} [Status and limits](status.qmd){.btn .btn-outline-secondary}
+
+::: {.callout-warning}
+## Current status
+The prototype implements software bindings and evidence mechanics. It has not
+established scientific validity, evaluated a robot foundation model, validated
+physical laboratory execution or demonstrated deployed safeguard effectiveness. See
+[Status and limits](status.qmd).
+:::
+
+## Mission
+
+Litmus prepares for a future of autonomous science by continuously testing and
+strengthening safeguards at critical AIxBio infrastructure chokepoints. Our immediate
+priority is AI-enabled biological misuse.
+
+Studies need to establish what agents accomplished and whether defenses prevented
+disallowed work while allowing legitimate research. A refusal, an accepted request or
+an agent's report cannot establish the outcome of the wider workflow. Inspect Labs is
+the evaluation layer for that question: reusable laboratory environments for
+capability measurement and adversarial testing of safeguards.
+
+| Layer | Role |
+|-------|------|
+| Inspect Labs | Reliable interfaces and evaluation methods that researchers can reuse |
+| Litmus Labs | Domain-reviewed environments representing meaningful laboratory work |
+| Litmus partnerships | Scientific judgment, authorized access, recurring studies and verification of fixes |
+
+We aim to work with researchers and infrastructure providers to turn findings into
+improved safeguards, then repeat the evaluation as capabilities and deployments
+change. A provider fixing a failure and passing a repeat test is more useful evidence
+than a growing count of adapters.
+
+## Studies we aim to support
+
+The framework supplies connections and evidence. Researchers define comparison
+groups, assignments, outcome measures and analysis. Software tests cannot establish
+scientific validity or the causal effect of AI assistance.
+
+| Study | Purpose | What Inspect Labs contributes |
+|-------|---------|-------------------------------|
+| Hybrid evaluations | Assess performance and safeguards across digital and physical work | Link software records, robot trials and laboratory measurements |
+| Experimental verification | Check whether model-generated outputs work experimentally | Connect generated outputs to independently measured results |
+| Pilot uplift studies | Inform the design of larger randomized studies | Record completion, intermediate progress and observation failures on matched tasks |
+| Rapid uplift studies | Track performance with and without AI on bounded research tasks | Reuse environments and compare outcomes under defined conditions |
+| Demonstrations for decision makers | Establish concrete capabilities and failures relevant to safeguards | Present checked outcomes with supporting records and explicit limits |
+
+These are proposed uses, not completed studies.
+
+## Next milestone
+
+The next research milestone is one independently useful environment, developed with
+laboratory researchers and a service provider, around a real research question with
+legitimate controls. Another researcher should be able to adopt it for a study. It
+needs meaningful tasks, independently checked outcomes, difficult legitimate controls
+and reproducible records.
+
+A candidate spans research planning, provider review, simulated robotic execution and
+result analysis using harmless materials. The exact workflow will be chosen with
+prospective research users. It would test what agents can accomplish, whether
+safeguards prevent unauthorized work while allowing legitimate research, and whether
+intervention stops downstream execution, verifying the resulting state rather than
+treating a hold or cancellation receipt as prevention.
+
+Robotics is central to the physical laboratory mission. Robot actions affect samples
+and equipment, and evaluations need to connect those actions to software decisions,
+service activity and laboratory measurements.
+
+## Development path
+
+Each stage needs its own evidence before the next.
+
+| Stage | Deliverable | Evidence required before advancing |
+|-------|-------------|------------------------------------|
+| Software foundation [Current]{.state .observed} | Installed authoring surface, native execution and saved-evidence replay | A user can author and run a task outside the checkout; replay submits no new actions; failures and missing observations remain distinguishable |
+| Reusable research environment | A domain-reviewed task set with legitimate and disallowed cases | Independent review of tasks and observations; difficult legitimate controls; a second author uses the environment for another study |
+| Robotic laboratory simulation | A real robot policy evaluated on harmless laboratory tasks | Native robot records, independently checked outcomes, repeated trials and tests separating refusal, execution failure and missing evidence |
+| Hybrid laboratory study | Selected digital outputs or robot-operated steps checked experimentally | An approved protocol, validated measurements, comparison conditions and a documented account of simulation and experimental limits |
+| Recurring provider evaluation | Bounded adversarial testing with an infrastructure partner | Authorized access, provider-specific policies, observed downstream outcomes and verification of fixes under the same protocol |
+
+Environment-building challenges could recruit contributors once a reliable starter
+environment and tested judging method exist. Incident-response exercises could test
+detection, intervention, downstream containment and recovery with specialist
+partners. These are future directions, not deployed services.
+
+## Conditions for credible claims
+
+- Measure capabilities, safeguard effectiveness and workflow validity separately.
+  Failure to complete a task is not by itself evidence of prevention.
+- Preserve unknown outcomes. Record how often observations are available as well as
+  how often tasks succeed.
+- Keep evaluator records outside the agent's control. Hashes identify changes but do
+  not authenticate a compromised source.
+- Check legitimate research alongside disallowed cases. Define prohibited work and
+  provider policy before scoring an adversarial study.
+- Revalidate tasks and scoring when changing services, simulators or hardware.
+  Simulation results do not establish physical safety.
+- Protect private logs, sensitive scenarios and provider data. Share reviewed methods
+  and sanitized artifacts under appropriate access conditions.
+
+## Work with us
+
+We are looking for laboratory researchers with legitimate research cases and a
+safeguard question, and for infrastructure providers interested in recurring, bounded
+evaluations. Domain experts, evaluation researchers and roboticists all have concrete
+contributions to make. Sensitive scenarios and provider data stay under controlled
+access. Start from the [repository](https://github.com/litmus-labs/inspect-labs) or
+the [framework paper](paper.qmd).

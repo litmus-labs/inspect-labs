@@ -11,7 +11,6 @@ htmlcov/
 dist/
 *.egg-info/
 node_modules/
-.mintlify/
 logs/
 *.eval
 *.labs

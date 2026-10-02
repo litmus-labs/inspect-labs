@@ -1,0 +1,105 @@
+project:
+  type: website
+  output-dir: _site
+  resources:
+    - assets/
+    - robots.txt
+
+website:
+  title: "Inspect Labs"
+  site-url: https://inspectlabs.org
+  description: "Laboratory evaluations for Inspect AI: scoped laboratory tools, independent records of what happened, and replay without dispatch."
+  favicon: assets/favicon.svg
+  search:
+    show-item-context: true
+  llms-txt: true
+  page-navigation: true
+  bread-crumbs: false
+  repo-url: https://github.com/litmus-labs/inspect-labs
+  repo-subdir: site
+  repo-actions: [edit, issue]
+  navbar:
+    logo:
+      path: assets/mark.svg
+      alt: "Inspect Labs mark"
+    title: "Inspect Labs"
+    left:
+      - text: "User Guide"
+        href: index.qmd
+      - text: "Environments"
+        href: environments.qmd
+      - text: "Reference"
+        href: reference.qmd
+      - text: "Research"
+        href: research.qmd
+    right:
+      - icon: github
+        href: https://github.com/litmus-labs/inspect-labs
+        aria-label: "Inspect Labs on GitHub"
+  sidebar:
+    - id: guide
+      title: "User Guide"
+      style: docked
+      collapse-level: 2
+      contents:
+        - section: "Basics"
+          contents:
+            - text: "Welcome"
+              href: index.qmd
+            - quickstart.qmd
+            - concepts.qmd
+        - section: "Building evaluations"
+          contents:
+            - authoring.qmd
+            - evidence.qmd
+    - id: environments
+      title: "Environments"
+      contents:
+        - section: "Environments"
+          contents:
+            - environments.qmd
+    - id: reference
+      title: "Reference"
+      contents:
+        - section: "Reference"
+          contents:
+            - reference.qmd
+    - id: research
+      title: "Research"
+      contents:
+        - section: "Research"
+          contents:
+            - research.qmd
+            - text: "Framework paper"
+              href: paper.qmd
+            - status.qmd
+  page-footer:
+    left: "Inspect Labs is maintained by Litmus. Litmus Labs names its research environments. Early prototype, provisional API, MIT licensed."
+    right:
+      - text: "Built on Inspect AI"
+        href: https://inspect.aisi.org.uk/
+      - icon: github
+        href: https://github.com/litmus-labs/inspect-labs
+        aria-label: "Source on GitHub"
+
+format:
+  html:
+    theme:
+      dark: [default, theme/base.scss, theme/dark.scss]
+      light: [default, theme/base.scss, theme/light.scss]
+    css: theme/fonts.css
+    filters:
+      - filters/table-scroll.lua
+    highlight-style: github
+    toc: true
+    toc-depth: 2
+    toc-title: "On this page"
+    code-copy: true
+    code-overflow: scroll
+    anchor-sections: true
+    smooth-scroll: false
+    link-external-newwindow: false
+    grid:
+      sidebar-width: 260px
+      body-width: 820px
+      margin-width: 240px

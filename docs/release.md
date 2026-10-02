@@ -13,9 +13,10 @@ including the fresh installed-wheel check. It builds four distributions,
 installs them outside the checkout, runs native controls and verifies replay.
 Never reuse a stale wheel from an earlier development cycle.
 
-Build the [website](../website/README.md) and validate the
-[Mintlify docs](../docs-site/README.md). Check the website on desktop and mobile,
-including examples, docs navigation, PDF viewing and the Reveal.js walkthrough.
+Render the [documentation site](../site/README.md) and run
+`scripts/check-site.py`. Check it on desktop and mobile, including the mobile
+sidebar, search, no horizontal scroll at 375px, PDF viewing and every command
+shown on the site.
 Check that all four package distributions include their MIT license and that
 the core distribution retains its upstream notice.
 
@@ -31,9 +32,8 @@ and public manuscript version. The paper was submitted anonymously; do not
 assume the submitted PDF is cleared for an identifying public site during review.
 Configure private vulnerability reporting in the chosen repository before launch.
 
-The website's publication build requires approved HTTPS addresses. The docs
-navbar also needs the approved site and paper addresses. Publish the static site
-build and reviewed docs source, never the private working directory.
+Deploy only the rendered `site/_site/` directory, never the private working
+directory. The site is served at https://inspectlabs.org; other hostnames redirect to it.
 
 Hosted CI, independent researcher use, domain validation, physical trials and the
 real full-reference Commec integration are separate gates. They must not be

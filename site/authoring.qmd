@@ -1,0 +1,110 @@
+---
+title: "Author a laboratory evaluation"
+description: "Bind a native Inspect task to scoped tools, observations and a pure outcome judge."
+---
+
+Write the Inspect task first. Define the question, sample inputs, agent scaffold,
+limits and approval policy. Add only the laboratory actions and observations the
+study needs.
+
+## Use an existing example
+
+The checkout includes `examples/custom_assay.py`, an author-owned native task using a
+synthetic measurement service. Run it from the checkout after installation:
+
+```bash
+umask 077
+inspect eval examples/custom_assay.py@custom_assay \
+  --model mockllm/model -T scripted=true \
+  -T evidence_dir=.research/custom-evidence \
+  --log-dir .research/custom-logs
+```
+
+The example changes the requested resource and inputs and uses native approvals.
+Add `-T reject=true` to exercise its approval-rejection control. Copy the example
+into your own study and retain its trusted reference outside actor-facing targets.
+
+`examples/reagent_addition.py` demonstrates a liquid-handling task with a custom
+layout, required operations and task-specific metrics. Both examples use the public
+API without modifying framework source.
+
+## Provide an environment
+
+Implement the structural `LabEnvironment` protocol. Inheritance is unnecessary.
+
+| Member | Contract |
+| --- | --- |
+| `info` | `EnvironmentInfo` with name, version, mode, capabilities and operations |
+| `tools` | Native Inspect tools that call a scoped existing client |
+| `observe()` | Async, read-only collection of authoritative facts as strict JSON, or `None` |
+| `artifacts` | Supporting provider records and native child logs as paths |
+| `close()` | Async resource release without claiming execution stopped |
+
+Use the native sample UUID to scope actions and observations. Keep credentials in the
+trusted provider client. An actor must not receive the provider object or evaluator
+reference.
+
+## Bind the task
+
+`bind_task` accepts an unscored native `Task`. It attaches setup, observation scoring
+and cleanup while preserving the solver. This is the binding call used by the
+measurement example:
+
+```python
+from pathlib import Path
+
+from inspect_labs import bind_task
+from inspect_labs.environments import MeasurementEnvironment
+from inspect_labs.litmus_labs import FixtureService
+from inspect_labs.tasks import OUTCOME_METRICS, measurement_outcome
+
+# result is the native Task and request is its trusted reference Request.
+evaluation = bind_task(
+    result,
+    environment=lambda state: MeasurementEnvironment(
+        state.uuid, request, FixtureService(frozenset({"sensor-b"}))
+    ),
+    judge=measurement_outcome,
+    requires=frozenset({"measurement", "reconcile"}),
+    evidence_dir=Path(".research/custom-evidence"),
+    metrics=OUTCOME_METRICS,
+)
+```
+
+This excerpt is a binding recipe, not a standalone task. The complete runnable
+definition is `examples/custom_assay.py` in the checkout.
+
+## Define a judge
+
+A judge accepts `(report: str, evidence: LabEvidence)` and returns numeric metrics.
+It must be pure so it can run on saved evidence later. Validate the observation
+schema, provenance and required child records before judging correctness.
+
+Declare every returned metric in `bind_task(..., metrics=(...))`, including `known`
+and `correct`. The binding fills unknown outcomes and omitted metrics with NaN.
+An undeclared metric is an error.
+
+Choose separate measures for capability, reporting and safeguard effectiveness.
+An agent report, approval verdict or acceptance receipt is not ground truth.
+
+## Check the binding
+
+Use the conformance check in your provider tests:
+
+```python
+import anyio
+from inspect_labs import check_environment
+
+# make_binding returns a fresh environment.
+# count_accepted_jobs reads accepted work from the provider's own records.
+report = anyio.run(check_environment, make_binding, count_accepted_jobs)
+assert report.passed, report.violations
+```
+
+It checks for lifecycle dispatch, unusable tools, failed or unstable observations and
+missing artifacts without calling actor tools. Passing verifies those mechanics, not
+the provider's security, declaration truth or scientific validity.
+
+Before a study, test observation loss, contradictory records, rejected requests,
+agent errors and legitimate completion. Have another researcher review the task and
+its scoring. [Evidence guide](evidence.qmd).

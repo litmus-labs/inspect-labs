@@ -1,0 +1,163 @@
+---
+title: "Environments and plugins"
+description: "What you can evaluate today, what each environment observes, and what it does not establish."
+---
+
+An environment gives an agent scoped tools and gives the evaluator an independent
+record. Current environments are building blocks: a meaningful study also needs
+domain-reviewed tasks, legitimate controls and valid outcome measures.
+
+| Environment | Native task | Mode |
+|-------------|-------------|------|
+| [Liquid handling](#liquid-handling) | `inspect_labs/serial_dilution`, `inspect_labs/worklist_transfer` | [Simulation]{.state .neutral} |
+| [Measurement and report services](#measurement-and-report-services) | `inspect_labs/measurement`, `inspect_labs/handoff` | [Synthetic]{.state .neutral} |
+| [Plate-reader QC](#plate-reader-qc) | `inspect_labs_plate_reader/absorbance_qc` | [Synthetic]{.state .neutral} |
+| [Screening review](#screening-review) | `inspect_labs_commec/screening_review` | [Gate pending]{.state .unknown} |
+| [Robot steps](#robot-steps) | `inspect_labs/robot_step` | [Software controls]{.state .neutral} |
+
+Each scripted control below runs from an installed checkout without model credentials.
+
+## Liquid handling
+
+An agent plans and runs pipetting work on a [PyLabRobot](https://docs.pylabrobot.org/)
+deck. The judge reads the deck, not the agent's account of it.
+
+Observations
+: Deck state, volumes, concentrations, tip use and restricted-well events
+
+Backends
+: Built-in simulator; an OT-2 simulator and OT-2 declarations in the Opentrons plugin
+
+Limits
+: The default backend is simulated and assumes ideal mixing. No physical instrument
+  has been validated.
+
+```bash
+inspect eval inspect_labs/serial_dilution \
+  --model mockllm/model -T scripted=true
+```
+
+## Measurement and report services
+
+Queued services that separate a request being accepted from work being done, and a
+report from the result.
+
+Observations
+: Job identity, state and recorded result; delivery destination and content identity
+
+Limits
+: Synthetic fixtures that exercise software mechanics. A robot-gated handoff does not
+  demonstrate physical sample transfer.
+
+```bash
+inspect eval inspect_labs/measurement \
+  --model mockllm/model -T scripted=true
+```
+
+## Plate-reader QC
+
+An absorbance quality-control task through PyLabRobot's device-free plate-reader
+interface. Requires the `plugins/inspect-labs-plate-reader` plugin.
+
+Limits
+: Seeded synthetic values. Not a validated assay or a physical reader.
+
+```bash
+inspect eval inspect_labs_plate_reader/absorbance_qc \
+  --model mockllm/model -T scripted=true
+```
+
+## Screening review
+
+A bounded review of a sequence-screening result using IBBIS's open-source Common
+Mechanism (commec) and a simulated disposition service. Requires the
+`plugins/inspect-labs-commec` plugin.
+
+Limits
+: Fixture mechanics are verified. The full-reference scanner runtime is a pending
+  gate, and no real order is fulfilled. Scanner recommendations are not biological
+  ground truth or authorization. No IBBIS affiliation is implied.
+
+```bash
+inspect eval inspect_labs_commec/screening_review \
+  --model mockllm/model -T fixture=true -T scripted=true
+```
+
+## Robot steps
+
+A laboratory step executed by any registered
+[Inspect Robots](https://github.com/robocurve/inspect-robots) task, policy and
+embodiment, under its native guardrails. Requires the `robots` extra.
+
+Observations
+: Native Inspect Robots trial records and metrics, linked by hash
+
+Limits
+: Deterministic software controls only. No physical validation and no robot
+  foundation model study.
+
+```bash
+inspect eval inspect_labs/robot_step \
+  --model mockllm/model -T scripted=true
+```
+
+## Discover installed components
+
+Environments and instrument backends are plugins discovered by name:
+
+```bash
+inspect-labs list
+inspect-labs doctor --environment liquid-handler
+```
+
+`doctor` checks declarations and requirements without constructing providers or
+touching hardware. It does not run lifecycle conformance or verify that an instrument
+or external runtime works.
+
+## Install optional plugins
+
+Install plugins from the checkout into the same Python environment:
+
+```bash
+uv pip install --python .venv/bin/python \
+  ./plugins/inspect-labs-opentrons \
+  ./plugins/inspect-labs-plate-reader \
+  ./plugins/inspect-labs-commec
+```
+
+| Plugin | Provides | Current limits |
+|--------|----------|----------------|
+| Opentrons | OT-2 backend declarations and a simulator | Simulator mechanics do not establish hardware compatibility |
+| Plate reader | Native absorbance QC task through PyLabRobot's device-free reader API | Seeded synthetic values, no validated assay or physical reader |
+| Common Mechanism | Bounded screening review with IBBIS Commec and a simulated disposition service | Fixture mechanics verified; full-reference runtime gate pending; no real order fulfillment |
+
+Each plugin directory includes its own README, controls and tests.
+
+## Robot integration
+
+```bash
+uv pip install --python .venv/bin/python '.[robots]'
+```
+
+The extra installs a pinned Inspect Robots commit. Robot tasks use its registered
+policies and embodiments. Robots come from Inspect Robots rather than being
+reimplemented. Physical embodiments require explicit identities for supported native
+device slots and host authorization before construction. Default guardrails remain
+native.
+
+::: {.callout-warning}
+## Physical systems are refused by default
+A host must pass `allow_physical=True`. That assertion does not provide facility
+authorization, interlocks or a validated physical protocol. Device claims coordinate
+participating evaluations on one host.
+:::
+
+## Publish a plugin
+
+Packages register environments and backends using the Python entry-point groups
+`inspect_labs.environments` and `inspect_labs.backends`. Declare runtime requirements,
+device identities and computation, simulation or physical mode honestly. Existing
+clients continue to own operational jobs, access control and cancellation.
+
+The detailed source guides are `docs/adapters.md` and `docs/authoring.md` in the
+checkout. The [authoring guide](authoring.qmd) introduces the public binding protocol.

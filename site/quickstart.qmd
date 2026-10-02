@@ -1,0 +1,121 @@
+---
+title: "Run your first evaluation"
+description: "Install from the checkout and run a deterministic laboratory control with native Inspect."
+---
+
+## Install
+
+Use Python 3.12 or newer and [uv](https://docs.astral.sh/uv/). Run these commands from
+the Inspect Labs checkout. The package is installed from source.
+
+```bash
+git clone https://github.com/litmus-labs/inspect-labs.git
+cd inspect-labs
+uv venv --no-project --python 3.12 .venv
+uv pip install --python .venv/bin/python '.[pylabrobot]'
+source .venv/bin/activate
+```
+
+The `pylabrobot` extra supplies the liquid-handling environment. The core package
+includes synthetic measurement and report-transfer services.
+
+## Run a scripted control
+
+```bash
+umask 077
+inspect eval inspect_labs/serial_dilution \
+  --model mockllm/model -T scripted=true \
+  -T evidence_dir=.research/dilution-evidence \
+  --log-dir .research/dilution-logs
+inspect view --log-dir .research/dilution-logs
+```
+
+This control carries out a predefined dilution protocol in a PyLabRobot-backed
+simulator. It requires no model credentials and operates no hardware. Inspect runs
+the task and opens its native viewer. Inspect Labs records the final deck observations
+and scores concentrations, volumes and reagent integrity.
+
+`scripted=true` selects the control explicitly. A successful control checks the
+software path, not an AI model's capability or the scientific validity of the simulator.
+
+## Inspect the result
+
+Look for the native `.eval` log in the log directory. When evidence collection
+finishes, a linked `.labs` companion records the evaluator's observations and artifact
+hashes. Keep both files and their supporting artifacts at their recorded paths.
+
+Reference tasks distinguish:
+
+- `known` indicates that an outcome was observed.
+- `executed` indicates that the required work occurred.
+- `honest` checks the agent's final report against the observations.
+- `correct` requires the reference task's execution and reporting conditions.
+
+Unknown outcomes are unscored. They are not counted as successful prevention.
+
+## Rescore saved evidence
+
+Replace the paths below with the files from your run. Choose a new output path.
+
+```bash
+inspect-labs rescore path/to/run.eval \
+  --evidence path/to/run.labs \
+  --output path/to/run.rescored.eval
+```
+
+Rescoring verifies the saved links and applies the judge without running the agent or
+laboratory again. See [evidence and replay](evidence.qmd).
+
+## Modify an example task
+
+Copy an example outside the checkout and change it. Your task stays a native Inspect
+task; you do not edit Inspect Labs:
+
+```bash
+mkdir ../my-study && cp examples/reagent_addition.py ../my-study/my_assay.py
+cd ../my-study
+```
+
+In `my_assay.py`, change the defaults of `reagent_addition`, for example
+`volume_ul: float = 40.0` and `columns: int = 6`. Then run your version:
+
+```bash
+inspect eval my_assay.py@reagent_addition --model mockllm/model -T scripted=true \
+  -T evidence_dir=evidence --log-dir logs
+```
+
+A task you wrote is not built in, so name its judge when rescoring. `--judge` runs the
+code you name. It is never read from the evidence file:
+
+```bash
+inspect-labs rescore logs/RUN.eval --evidence logs/RUN.labs \
+  --output logs/RUN.rescored.eval --judge my_assay.py:reagent_outcome
+```
+
+The output reports `"replay_only": true`. Replay constructs no environment and calls no
+model by design, rather than counting dispatches. See [authoring](authoring.qmd) to
+write a task from scratch.
+
+## Evaluate a model
+
+Install the optional provider dependency if your selected native Inspect provider
+requires it:
+
+```bash
+uv pip install --python .venv/bin/python '.[openai]'
+```
+
+Choose the model, study conditions and budget before running. Omit `scripted=true` to
+use native model generation:
+
+```bash
+inspect eval inspect_labs/serial_dilution \
+  --model PROVIDER/MODEL \
+  -T evidence_dir=.research/model-evidence \
+  --log-dir .research/model-logs
+```
+
+Configure credentials using the chosen provider's native Inspect instructions. Do not
+put them in a task, dataset, tool response or public log. Native per-sample cost limits
+require model price data and are not strict billing caps. The convenience CLI also
+requires `--allow-live` and an enforceable cost limit for live runs.

@@ -1,0 +1,39 @@
+/*-- scss:defaults --*/
+// Tokens sampled from the Mintlify docs theme in dark mode.
+$body-bg: #0a0b0c;
+$body-color: #b4b6b6;
+$headings-color: #f3f5f5;
+$primary: #84bbb1;
+$link-color: #84bbb1;
+$border-color: #262827;
+$navbar-bg: #0a0b0c;
+$navbar-fg: #b4b6b6;
+$navbar-hl: #f3f5f5;
+$sidebar-bg: #0a0b0c;
+$sidebar-fg: #b4b6b6;
+$sidebar-hl: #f3f5f5;
+$footer-bg: #0a0b0c;
+$footer-fg: #9a9c9c;
+$code-block-bg: #121414;
+$code-color: #f3f5f5;
+$table-color: #b4b6b6;
+$table-border-color: #262827;
+$input-bg: #121414;
+$input-color: #f3f5f5;
+$input-border-color: #3d403f;
+$text-muted: #9a9c9c;
+$callout-color-note: #84bbb1;
+$callout-color-tip: #84bbb1;
+$callout-color-important: #84bbb1;
+$callout-color-warning: #e4b363;
+$callout-color-caution: #e4b363;
+
+/*-- scss:rules --*/
+:root {
+  color-scheme: dark;
+  --il-ink: #f3f5f5; --il-ink-2: #b4b6b6; --il-ink-3: #9a9c9c;
+  --il-panel: #121414; --il-sunk: #171919;
+  --il-border: #262827; --il-border-strong: #3d403f;
+  --il-accent: #84bbb1;
+  --il-observed: #84bbb1; --il-unknown: #e4b363; --il-refused: #ef9fbd;
+}

@@ -195,8 +195,8 @@ Pinned upstream dependencies:
 | Inspect Robots | `3c832c34b6c11fa5205ff80ab4947247fedd5eea` | |
 
 Inspect AI, Inspect Robots, PyLabRobot and Opentrons are MIT-licensed, and their
-runtimes remain separate. Website components retain their own
-[upstream notices](website/THIRD_PARTY_NOTICES.md).
+runtimes remain separate. Documentation site components retain their own
+[upstream notices](site/THIRD_PARTY_NOTICES.md).
 ASTRAL and RIDArena are read-only references; no code is copied from them.
 
 ## Development
@@ -223,12 +223,13 @@ instrument; they establish software mechanics only.
 The [source registry](docs/design.md) declares every module's responsibility, public
 surface and allowed dependencies. `tests/test_architecture.py` enforces it.
 
-## Website, documentation and source release
+## Documentation site and source release
 
-The [framework website](website/README.md) explains the laboratory evaluation layer
-with an interactive evidence example, a Reveal.js walkthrough and an embedded
-paper page. The [Mintlify docs](docs-site/README.md) cover the quickstart,
-environment authoring, evidence and public API. Both have local previews.
+The [documentation site](site/README.md) is the project website, as with Inspect AI.
+It covers the quickstart, evaluation model, authoring, each environment with a
+verified run command and its limits, evidence and replay, the public API, the
+Litmus research path and the paper. It is a Quarto site; preview it with
+`quarto preview site`.
 
 This is a source prerelease, not a published PyPI package. The robot extra retains
 a pinned Git dependency, which must be resolved before an index upload. See the

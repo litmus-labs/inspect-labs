@@ -1,0 +1,67 @@
+---
+title: "How an evaluation works"
+description: "A native Inspect task, a laboratory binding and separately observed outcomes."
+---
+
+Start with a research question and a normal Inspect AI `Task`. Its sample states a
+goal, its agent acts through tools, and its scorer judges the outcome. Inspect Labs
+adds a laboratory environment and the observations needed to judge that work.
+
+## Two inputs
+
+The agent and laboratory can change independently.
+
+**The agent** is an Inspect model and solver or agent scaffold. Native `--model` and
+`--solver` options change these without replacing the task.
+
+**The laboratory** implements `LabEnvironment`. It provides scoped tools, declares
+capabilities and operations, and reads observations through `observe()`. Its existing
+provider or instrument stack continues to own execution and durable state.
+
+## Evaluation sequence
+
+1. A trusted factory constructs an environment for the sample.
+2. Inspect Labs checks its declarations against the task requirements and physical
+   authorization before installing actor tools.
+3. The native Inspect agent uses the tools. Native approvals and provider policies
+   remain separate controls.
+4. The binding collects read-only observations at scoring and cleanup, including
+   early exits. Observation failures are recorded as unknown.
+5. A pure judge compares the agent's report with the observations and reference.
+6. A completed native run can seal linked evidence for later rescoring.
+
+Construction, observation and closing must not secretly submit work. Closing a client
+does not establish that an accepted job or physical operation stopped.
+
+## Observed outcomes
+
+| State | Meaning | Scoring |
+| --- | --- | --- |
+| Completed work | Observations establish the required task outcome | Judge evaluates correctness and reporting |
+| Observed non-completion | Complete provider records show no qualifying completed work | Known outcome, unsuccessful execution |
+| Unavailable observation | The evaluator cannot establish the result | `known=0`, other metrics unscored |
+
+A successful observation of an idle or refused agent is a known non-completion. A
+missing observation is unknown. To make this distinction, an environment must establish
+that the relevant provider records are complete.
+
+Invalid evidence is a separate failure. A task judge can reject malformed payloads
+or conflicting provenance with a native sample error. Replay rejects mismatched
+records rather than replacing them with unknown scores.
+
+## Safeguards
+
+An unsuccessful task does not by itself establish that a safeguard worked. Separate
+an attempted violation, provider enforcement, execution failure and missing evidence.
+Test legitimate research alongside disallowed cases so a defense cannot appear useful
+merely by blocking all activity.
+
+## Robots
+
+Robots carry an agent's decisions into physical work with samples and equipment.
+The native Inspect Robots bridge links a robot trial and its observations to a parent
+Inspect AI task. Inspect Robots owns the policy, embodiment, trial execution and robot
+metrics. Inspect Labs judges their significance for the laboratory workflow.
+
+The bridge is implemented. Physical laboratory validation and evaluation of a robot
+foundation model remain future work. [Environment guide](environments.qmd).
