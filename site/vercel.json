@@ -53,6 +53,28 @@
   ],
   "redirects": [
     {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.inspectlabs.org"
+        }
+      ],
+      "destination": "https://inspectlabs.org/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "inspect-labs.vercel.app"
+        }
+      ],
+      "destination": "https://inspectlabs.org/:path*",
+      "permanent": true
+    },
+    {
       "source": "/environments",
       "destination": "/labs",
       "permanent": true
