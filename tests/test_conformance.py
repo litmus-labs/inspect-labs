@@ -206,7 +206,7 @@ def test_factory_failure_and_volatile_keys() -> None:
     assert check(frozenset({"read_at"})).passed
 
 
-@pytest.mark.parametrize("kind", ["environment", "backend"])
+@pytest.mark.parametrize("kind", ["lab", "environment", "backend"])
 def test_doctor_checks_declarations_without_constructing_physical_components(kind: str) -> None:
     from inspect_labs import plugins
     from inspect_labs.conformance import diagnose
@@ -218,3 +218,38 @@ def test_doctor_checks_declarations_without_constructing_physical_components(kin
     report = anyio.run(diagnose, kind, f"physical-doctor-{kind}")
     assert report["ok"]
     assert report["conformance"] == "not_run"
+
+
+def test_lab_is_the_canonical_kind_and_environment_a_legacy_alias() -> None:
+    from inspect_labs import plugins
+
+    @plugins.lab("alias-check-lab")
+    def make_lab(*args):
+        raise AssertionError("registration must not construct")
+
+    assert "alias-check-lab" in plugins.available("lab")
+    assert "alias-check-lab" in plugins.available("environment")
+    assert plugins.factory("environment", "alias-check-lab") is make_lab
+    with pytest.raises(ValueError, match="already registered"):
+        plugins.environment("alias-check-lab")(make_lab)
+    with pytest.raises(ValueError, match="Unknown component kind"):
+        plugins.canonical("sandbox")
+
+
+def test_new_entry_point_group_wins_over_the_legacy_group(monkeypatch) -> None:
+    from importlib.metadata import EntryPoint
+
+    from inspect_labs import plugins
+
+    groups = {
+        "inspect_labs.labs": [EntryPoint("shared", "new_pkg:make", "inspect_labs.labs")],
+        "inspect_labs.environments": [
+            EntryPoint("shared", "old_pkg:make", "inspect_labs.environments"),
+            EntryPoint("legacy-only", "old_pkg:other", "inspect_labs.environments"),
+        ],
+    }
+    monkeypatch.setattr(plugins, "entry_points", lambda group: groups.get(group, []))
+
+    points = plugins._entry_points("lab")
+    assert points["shared"].value == "new_pkg:make"
+    assert points["legacy-only"].value == "old_pkg:other"

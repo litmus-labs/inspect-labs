@@ -29,7 +29,7 @@ inspect_labs = "inspect_labs.registry"
 [project.entry-points."inspect_labs.backends"]
 simulator = "inspect_labs.liquid_handling:simulator_backend"
 
-[project.entry-points."inspect_labs.environments"]
+[project.entry-points."inspect_labs.labs"]
 liquid-handler = "inspect_labs.liquid_handling:liquid_handler_environment"
 litmus-measurement = "inspect_labs.environments:measurement_environment"
 litmus-handoff = "inspect_labs.environments:handoff_environment"

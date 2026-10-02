@@ -1,10 +1,19 @@
-"""Registry of laboratory environments and instrument backends, with entry-point plugins.
+"""Registry of Labs and instrument backends, with entry-point plugins.
 
-Mirrors Inspect Robots' registry: components register by name, and packages publish
-entry points so an installed adapter is discoverable without being imported first::
+A Lab is the environment where laboratory work happens: a simulator, a digital
+twin or a real instrument stack. Like Inspect AI sandboxes, Labs are selected by
+name and swapped without changing the task. Components register by name, and
+packages publish entry points so an installed adapter is discoverable without
+being imported first::
+
+    [project.entry-points."inspect_labs.labs"]
+    plate-reader-qc = "inspect_labs_plate_reader:plate_reader_environment"
 
     [project.entry-points."inspect_labs.backends"]
     opentrons-ot2 = "inspect_labs_opentrons:opentrons_ot2"
+
+The earlier ``inspect_labs.environments`` group and the ``environment`` kind are
+still read, as aliases of ``inspect_labs.labs`` and ``lab``.
 
 Adapters declare what they need on the factory itself, so ``inspect-labs doctor`` can
 check an installation without constructing anything or touching hardware:
@@ -24,11 +33,27 @@ from dataclasses import dataclass
 from importlib.metadata import EntryPoint, entry_points
 from typing import Any, Literal
 
-Kind = Literal["environment", "backend"]
-GROUPS: dict[Kind, str] = {
-    "environment": "inspect_labs.environments",
-    "backend": "inspect_labs.backends",
+Kind = Literal["lab", "backend", "environment"]
+"""Component kind. ``environment`` is a legacy alias of ``lab``."""
+
+GROUPS: dict[str, tuple[str, ...]] = {
+    "lab": ("inspect_labs.labs", "inspect_labs.environments"),
+    "backend": ("inspect_labs.backends",),
 }
+"""Entry-point groups per canonical kind, newest first."""
+
+
+def canonical(kind: str) -> Literal["lab", "backend"]:
+    """Map a kind or its legacy alias to the canonical kind.
+
+    Raises:
+        ValueError: The kind is not ``lab``, ``environment`` or ``backend``.
+    """
+    if kind in ("lab", "environment"):
+        return "lab"
+    if kind == "backend":
+        return "backend"
+    raise ValueError(f"Unknown component kind {kind!r}; expected lab or backend")
 
 
 @dataclass(frozen=True)
@@ -66,7 +91,7 @@ class BackendBinding:
     notes: str = ""
 
 
-_local: dict[Kind, dict[str, Callable[..., Any]]] = {kind: {} for kind in GROUPS}
+_local: dict[str, dict[str, Callable[..., Any]]] = {kind: {} for kind in GROUPS}
 
 
 def register(kind: Kind, name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
@@ -76,18 +101,25 @@ def register(kind: Kind, name: str) -> Callable[[Callable[..., Any]], Callable[.
         ValueError: The name is already registered for this kind.
     """
 
+    key = canonical(kind)
+
     def decorator(factory: Callable[..., Any]) -> Callable[..., Any]:
-        if name in _local[kind]:
-            raise ValueError(f"{kind} {name!r} is already registered")
-        _local[kind][name] = factory
+        if name in _local[key]:
+            raise ValueError(f"{key} {name!r} is already registered")
+        _local[key][name] = factory
         return factory
 
     return decorator
 
 
+def lab(name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """Register a Lab: a `LabEnvironment` factory taking ``directory`` plus options."""
+    return register("lab", name)
+
+
 def environment(name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Register a `LabEnvironment` factory taking ``directory`` plus keyword options."""
-    return register("environment", name)
+    """Legacy alias of `lab`."""
+    return register("lab", name)
 
 
 def backend(name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
@@ -95,13 +127,18 @@ def backend(name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     return register("backend", name)
 
 
-def _entry_points(kind: Kind) -> dict[str, EntryPoint]:
-    return {point.name: point for point in entry_points(group=GROUPS[kind])}
+def _entry_points(kind: str) -> dict[str, EntryPoint]:
+    points: dict[str, EntryPoint] = {}
+    # Newest group first: a name in inspect_labs.labs wins over the legacy group.
+    for group in GROUPS[canonical(kind)]:
+        for point in entry_points(group=group):
+            points.setdefault(point.name, point)
+    return points
 
 
 def available(kind: Kind) -> list[str]:
     """Names of registered and installed components, without importing plugins."""
-    return sorted(set(_local[kind]) | set(_entry_points(kind)))
+    return sorted(set(_local[canonical(kind)]) | set(_entry_points(kind)))
 
 
 def factory(kind: Kind, name: str) -> Callable[..., Any]:
@@ -110,11 +147,12 @@ def factory(kind: Kind, name: str) -> Callable[..., Any]:
     Raises:
         LookupError: No component of this kind has that name.
     """
-    if name in _local[kind]:
-        return _local[kind][name]
-    points = _entry_points(kind)
+    key = canonical(kind)
+    if name in _local[key]:
+        return _local[key][name]
+    points = _entry_points(key)
     if name not in points:
-        raise LookupError(f"No {kind} named {name!r}; installed: {available(kind)}")
+        raise LookupError(f"No {key} named {name!r}; installed: {available(key)}")
     loaded: Callable[..., Any] = points[name].load()
     return loaded
 

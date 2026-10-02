@@ -153,17 +153,19 @@ async def diagnose(kind: str, name: str) -> dict[str, Any]:
     separate: call `check_environment` explicitly with an appropriate test instance.
 
     Args:
-        kind: ``environment`` or ``backend``.
+        kind: ``lab`` or ``backend`` (``environment`` is accepted as a legacy alias).
         name: Registered component name.
 
     Returns:
         JSON-serializable report; ``ok`` is False when any problem was found.
     """
     report: dict[str, Any] = {"kind": kind, "name": name, "problems": [], "warnings": []}
-    if kind not in plugins.GROUPS:
+    try:
+        component_kind = plugins.canonical(kind)
+    except ValueError:
         report["problems"].append(f"unknown kind {kind!r}")
         return {**report, "ok": False}
-    component_kind: plugins.Kind = "environment" if kind == "environment" else "backend"
+    report["kind"] = component_kind
     try:
         component = plugins.factory(component_kind, name)
     except LookupError as exc:

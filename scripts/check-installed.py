@@ -63,11 +63,11 @@ def verify_installed(work: Path, python: Path) -> None:
     listing = json.loads(
         run([str(bin_dir / "inspect-labs"), "list"], cwd=work, log=work / "list.log")
     )
-    assert "commec-review" in listing["environment"]
-    assert "plate-reader-qc" in listing["environment"]
+    assert "commec-review" in listing["lab"]
+    assert "plate-reader-qc" in listing["lab"]
     assert {"opentrons-ot2", "opentrons-ot2-simulator"} <= set(listing["backend"])
     run(
-        [str(bin_dir / "inspect-labs"), "doctor", "--environment", "plate-reader-qc"],
+        [str(bin_dir / "inspect-labs"), "doctor", "--lab", "plate-reader-qc"],
         cwd=work,
         log=work / "reader-doctor.log",
     )

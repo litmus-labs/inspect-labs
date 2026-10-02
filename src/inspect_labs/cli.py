@@ -22,7 +22,7 @@ from inspect_labs.bindings import EvidenceJudge, WorkflowEvidence, rescore_workf
 from inspect_labs.conformance import diagnose
 from inspect_labs.evidence import rescore_evidence
 from inspect_labs.liquid_tasks import serial_dilution_outcome, worklist_outcome
-from inspect_labs.plugins import Kind, available
+from inspect_labs.plugins import Kind, available, canonical
 from inspect_labs.tasks import (
     handoff,
     handoff_outcome,
@@ -104,13 +104,14 @@ def main() -> None:
         help="Judge for a custom task as FILE.py:function or module:function. This runs "
         "the named code; it is chosen by you, never read from the evidence file.",
     )
-    listing = commands.add_parser("list", help="List installed environments and backends")
-    listing.add_argument("kind", nargs="?", choices=["environment", "backend"])
+    listing = commands.add_parser("list", help="List installed Labs and backends")
+    listing.add_argument("kind", nargs="?", choices=["lab", "backend", "environment"])
     doctor = commands.add_parser(
-        "doctor", help="Check an installed environment or backend without touching hardware"
+        "doctor", help="Check an installed Lab or backend without touching hardware"
     )
     target = doctor.add_mutually_exclusive_group(required=True)
-    target.add_argument("--environment", help="Registered environment name")
+    target.add_argument("--lab", help="Registered Lab name")
+    target.add_argument("--environment", dest="lab", help=argparse.SUPPRESS)
     target.add_argument("--backend", help="Registered backend name")
     robot = commands.add_parser("robot-mock", help="Run the optional native robot mock baseline")
     robot.add_argument("--log-dir", type=Path, default=Path(".research/runs/robot-mock"))
@@ -121,12 +122,12 @@ def main() -> None:
     try:
         with contextlib.redirect_stdout(sys.stderr):
             if args.command == "list":
-                kinds: list[Kind] = [args.kind] if args.kind else ["environment", "backend"]
+                kinds: list[Kind] = [canonical(args.kind)] if args.kind else ["lab", "backend"]
                 print(json.dumps({kind: available(kind) for kind in kinds}), file=stdout)
                 return
             if args.command == "doctor":
-                kind = "environment" if args.environment else "backend"
-                report = anyio.run(diagnose, kind, args.environment or args.backend)
+                kind = "lab" if args.lab else "backend"
+                report = anyio.run(diagnose, kind, args.lab or args.backend)
                 print(json.dumps(report, indent=2), file=stdout)
                 if not report["ok"]:
                     raise SystemExit(1)

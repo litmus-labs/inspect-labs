@@ -348,7 +348,7 @@ def test_registry_names_are_unique_and_lookup_errors_are_clear() -> None:
     from inspect_labs import plugins
 
     assert {"simulator"} <= set(plugins.available("backend"))
-    assert {"liquid-handler", "litmus-measurement"} <= set(plugins.available("environment"))
+    assert {"liquid-handler", "litmus-measurement"} <= set(plugins.available("lab"))
     with pytest.raises(LookupError, match="No backend named 'absent'"):
         plugins.factory("backend", "absent")
     with pytest.raises(ValueError, match="already registered"):
