@@ -4,18 +4,21 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import importlib
+import importlib.util
 import json
 import math
 import os
 import sys
 from pathlib import Path
+from typing import cast
 
 import anyio
 from inspect_ai import eval
 from inspect_ai.log import read_eval_log
 from inspect_ai.model import ModelCost, ModelInfo, get_model_info, set_model_info
 
-from inspect_labs.bindings import WorkflowEvidence, rescore_workflow
+from inspect_labs.bindings import EvidenceJudge, WorkflowEvidence, rescore_workflow
 from inspect_labs.conformance import diagnose
 from inspect_labs.evidence import rescore_evidence
 from inspect_labs.liquid_tasks import serial_dilution_outcome, worklist_outcome
@@ -27,6 +30,43 @@ from inspect_labs.tasks import (
     measurement_outcome,
     robot_step_outcome,
 )
+
+
+class JudgeError(ValueError):
+    """A ``--judge`` specification could not be loaded."""
+
+
+def load_judge(spec: str) -> EvidenceJudge:
+    """Load a judge named explicitly by the user as ``FILE.py:function`` or ``module:function``.
+
+    Raises:
+        JudgeError: The specification is malformed, missing or not callable.
+    """
+    source, _, name = spec.rpartition(":")
+    if not source or not name:
+        raise JudgeError("--judge must look like FILE.py:function or module:function")
+    try:
+        if source.endswith(".py"):
+            path = Path(source).resolve()
+            module_spec = importlib.util.spec_from_file_location(f"_judge_{path.stem}", path)
+            if module_spec is None or module_spec.loader is None:
+                raise JudgeError(f"Cannot load judge file {source}")
+            sys.path.insert(0, str(path.parent))
+            try:
+                module = importlib.util.module_from_spec(module_spec)
+                module_spec.loader.exec_module(module)
+            finally:
+                sys.path.remove(str(path.parent))
+        else:
+            module = importlib.import_module(source)
+    except FileNotFoundError as exc:
+        raise JudgeError(f"Judge file not found: {source}") from exc
+    except ImportError as exc:
+        raise JudgeError(f"Cannot import judge module {source}: {exc}") from exc
+    judge = getattr(module, name, None)
+    if not callable(judge):
+        raise JudgeError(f"{spec} is not a callable judge")
+    return cast(EvidenceJudge, judge)
 
 
 def main() -> None:
@@ -59,6 +99,11 @@ def main() -> None:
     replay.add_argument("native_log", type=Path)
     replay.add_argument("--evidence", type=Path, required=True)
     replay.add_argument("--output", type=Path, required=True)
+    replay.add_argument(
+        "--judge",
+        help="Judge for a custom task as FILE.py:function or module:function. This runs "
+        "the named code; it is chosen by you, never read from the evidence file.",
+    )
     listing = commands.add_parser("list", help="List installed environments and backends")
     listing.add_argument("kind", nargs="?", choices=["environment", "backend"])
     doctor = commands.add_parser(
@@ -124,23 +169,30 @@ def main() -> None:
                             "robot_step": robot_step_outcome,
                         }
                         task_name = bundle.task.rsplit("/", 1)[-1]
-                        if task_name not in judges:
+                        if args.judge:
+                            judge = load_judge(args.judge)
+                        elif task_name in judges:
+                            judge = judges[task_name]
+                        else:
                             parser.error(
-                                "Custom tasks require rescore_workflow with their trusted judge"
+                                f"Task {bundle.task!r} is not built in: pass its judge with "
+                                "--judge FILE.py:function (for example my_task.py:my_outcome)"
                             )
-                        rescore_workflow(
-                            args.native_log, args.evidence, args.output, judges[task_name]
-                        )
+                        rescore_workflow(args.native_log, args.evidence, args.output, judge)
                         log = read_eval_log(str(args.output))
                     else:
                         log = rescore_evidence(args.native_log, args.evidence, args.output)
+                except JudgeError as exc:
+                    parser.error(str(exc))
                 except (ValueError, OSError):
                     parser.error(
                         "Cannot rescore: invalid/mismatched evidence or unavailable file path"
                     )
                 print(
                     json.dumps(
-                        {"native_log": str(args.output), "status": log.status, "new_submissions": 0}
+                        # Replay constructs no environment and calls no model by design;
+                        # tests verify this. It is a property of the path, not a count.
+                        {"native_log": str(args.output), "status": log.status, "replay_only": True}
                     ),
                     file=stdout,
                 )

@@ -104,7 +104,7 @@ def verify_installed(work: Path, python: Path) -> None:
             log=work / "measurement-replay.log",
         )
     )
-    assert result["new_submissions"] == 0
+    assert result["replay_only"] is True
     assert (
         read_eval_log(str(replay)).samples[0].scores == read_eval_log(str(native)).samples[0].scores
     )
@@ -163,7 +163,7 @@ def verify_installed(work: Path, python: Path) -> None:
             log=work / "robot-replay.log",
         )
     )
-    assert robot_result["new_submissions"] == 0
+    assert robot_result["replay_only"] is True
     assert read_eval_log(str(robot_replay)).samples[0].scores == robot_parent.samples[0].scores
     assert [(path, path.stat().st_mtime_ns) for path in child_logs] == child_before
 
