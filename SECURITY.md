@@ -13,10 +13,9 @@ agent's control and review any artifact before sharing it.
 ## Reporting a vulnerability
 
 Do not post sensitive vulnerabilities, credentials, biological misuse scenarios
-or private evaluation records in public issues. Use the repository's private
-vulnerability reporting channel once the maintainer enables it. A private
-reporting route must be configured before the public release; this local
-checkout does not yet identify a public repository or reporting contact.
+or private evaluation records in public issues. Use the enabled
+[private vulnerability reporting channel](https://github.com/litmus-labs/inspect-labs/security/advisories/new)
+for this repository.
 
 For non-sensitive software bugs, prepare a minimal synthetic reproduction and
 include versions, observed behavior and expected behavior. There is no promised

@@ -6,9 +6,11 @@ description: "Install from the checkout and run a deterministic laboratory contr
 ## Install
 
 Use Python 3.12 or newer and [uv](https://docs.astral.sh/uv/). Run these commands from
-the Inspect Labs checkout. The package is installed from local source.
+the Inspect Labs checkout. The package is installed from source.
 
 ```bash
+git clone https://github.com/litmus-labs/inspect-labs.git
+cd inspect-labs
 uv venv --no-project --python 3.12 .venv
 uv pip install --python .venv/bin/python '.[pylabrobot]'
 source .venv/bin/activate

@@ -44,20 +44,30 @@
           </p>
         </div>
         <figure class="hero-figure">
-          <p class="eyebrow">One laboratory evaluation</p>
+          <div class="figure-heading">
+            <p class="eyebrow">One laboratory evaluation</p>
+            <span class="figure-number" aria-hidden="true">01</span>
+          </div>
           <div class="flow-node">
             <span class="small">Native evaluation</span
             ><strong>Inspect AI</strong
             ><span>Task · Agent · Tools · Scoring</span>
           </div>
-          <div class="flow-arrow" aria-hidden="true">↓</div>
+          <div class="flow-paths">
+            <span>Tool calls <b aria-hidden="true">↓</b></span>
+            <span><b aria-hidden="true">↑</b> Outcome evidence</span>
+          </div>
           <div class="flow-node labs">
             <span class="small">Laboratory connection</span
-            ><strong>Inspect Labs</strong
-            ><span>Environment tools and outcome observations</span>
+            ><strong>Inspect Labs</strong>
+            <div class="lab-functions">
+              <span>Scoped environment tools</span>
+              <span>Independent observations</span>
+            </div>
           </div>
-          <div class="branches" aria-hidden="true">
-            <span>↓</span><span>↓</span><span>↓</span>
+          <div class="flow-paths">
+            <span>Requests <b aria-hidden="true">↓</b></span>
+            <span><b aria-hidden="true">↑</b> Observations</span>
           </div>
           <div class="flow-environments">
             <div><strong>Software</strong><span>Research tools</span></div>
@@ -69,8 +79,25 @@
             observations to the task, so a report can be checked against what
             happened.
           </figcaption>
+          <a class="figure-link" href="#examples"
+            >Explore an outcome <span aria-hidden="true">↓</span></a
+          >
         </figure>
       </section>
+      <nav class="page-index wrap" aria-label="On this page">
+        <a href="#examples"
+          ><span aria-hidden="true">01</span> Evaluate outcomes</a
+        >
+        <a href="#how-it-works"
+          ><span aria-hidden="true">02</span> Connect the laboratory</a
+        >
+        <a href="#start"
+          ><span aria-hidden="true">03</span> Run an evaluation</a
+        >
+        <a href="#community"
+          ><span aria-hidden="true">04</span> Build with us</a
+        >
+      </nav>
       <section class="statement wrap" id="mission">
         <p class="eyebrow">Why laboratory evaluation</p>
         <h2>Test safeguards where scientific work happens.</h2>
@@ -122,7 +149,12 @@
               >
             </div>
           </fieldset>
-          <div class="evidence-example" aria-live="polite" aria-atomic="true">
+          <div
+            class="evidence-example"
+            data-scenario="completed"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             <div class="record">
               <p class="eyebrow">01 · Agent request</p>
               <h3>Measure a synthetic sample.</h3>
@@ -149,7 +181,7 @@
                 the report against the recorded result.
               </p>
               <p class="record-label">Outcome availability</p>
-              <strong id="known">Known</strong>
+              <strong id="known" class="outcome-state">Known</strong>
             </div>
           </div>
           <p class="small example-caption">
@@ -221,7 +253,9 @@
               <span>From the source checkout · Python 3.12+</span
               ><button id="copy-code" type="button">Copy commands</button>
             </div>
-            <pre><code id="quickstart-code">uv venv --no-project --python 3.12 .venv
+            <pre><code id="quickstart-code">git clone https://github.com/litmus-labs/inspect-labs.git
+cd inspect-labs
+uv venv --no-project --python 3.12 .venv
 uv pip install --python .venv/bin/python '.[pylabrobot,openai]'
 source .venv/bin/activate
 inspect eval inspect_labs/serial_dilution --model mockllm/model -T scripted=true
@@ -270,7 +304,10 @@ inspect view</code></pre>
                   Dilution and transfer tasks with deck, volume and reagent
                   observations.
                 </td>
-                <td>PyLabRobot simulation and Opentrons simulator controls.</td>
+                <td>
+                  <span class="evidence-kind">Simulation</span>PyLabRobot
+                  simulation and Opentrons simulator controls.
+                </td>
               </tr>
               <tr>
                 <th scope="row">Measurement services</th>
@@ -278,7 +315,10 @@ inspect view</code></pre>
                   Whether a submitted job completed and the report matches its
                   result.
                 </td>
-                <td>Queued service fixtures and synthetic plate-reader QC.</td>
+                <td>
+                  <span class="evidence-kind">Synthetic controls</span>Queued
+                  service fixtures and synthetic plate-reader QC.
+                </td>
               </tr>
               <tr>
                 <th scope="row">Screening review</th>
@@ -287,6 +327,9 @@ inspect view</code></pre>
                   disposition.
                 </td>
                 <td>
+                  <span class="evidence-kind pending"
+                    >Runtime verification pending</span
+                  >
                   Common Mechanism plugin mechanics. Full-reference runtime
                   verification remains pending.
                 </td>
@@ -298,6 +341,7 @@ inspect view</code></pre>
                   evaluations.
                 </td>
                 <td>
+                  <span class="evidence-kind">Software controls</span>
                   Inspect Robots bridge and deterministic software controls. No
                   physical validation or RFM study.
                 </td>
@@ -311,7 +355,7 @@ inspect view</code></pre>
           >
         </p>
       </section>
-      <section class="community">
+      <section class="community" id="community">
         <div class="wrap section">
           <p class="eyebrow">Build with the research community</p>
           <h2>Make laboratory evaluations<br />useful across studies.</h2>

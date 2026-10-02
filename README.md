@@ -27,6 +27,8 @@ their execution. Start with [concepts](docs/concepts.md).
 Python 3.12+:
 
 ```bash
+git clone https://github.com/litmus-labs/inspect-labs.git
+cd inspect-labs
 uv venv --no-project --python 3.12 .venv
 uv pip install --python .venv/bin/python '.[pylabrobot,openai]'
 source .venv/bin/activate

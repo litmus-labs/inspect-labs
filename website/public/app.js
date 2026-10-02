@@ -43,6 +43,7 @@ const targets = {
 };
 for (const input of document.querySelectorAll('input[name="scenario"]')) {
   input.addEventListener("change", () => {
+    document.querySelector(".evidence-example").dataset.scenario = input.value;
     for (const [key, id] of Object.entries(targets))
       document.getElementById(id).textContent = cases[input.value][key];
   });

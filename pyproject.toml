@@ -19,6 +19,10 @@ dependencies = [
     "fastapi<0.140.7",
 ]
 
+[project.urls]
+Source = "https://github.com/litmus-labs/inspect-labs"
+Issues = "https://github.com/litmus-labs/inspect-labs/issues"
+
 [project.entry-points.inspect_ai]
 inspect_labs = "inspect_labs.registry"
 

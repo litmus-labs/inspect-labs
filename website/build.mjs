@@ -10,7 +10,8 @@ const config = {
     /\/+$/,
     "",
   ),
-  SOURCE_URL: process.env.SOURCE_URL || "/source/",
+  SOURCE_URL:
+    process.env.SOURCE_URL || "https://github.com/litmus-labs/inspect-labs",
   SITE_URL: (process.env.SITE_URL || "http://localhost:4321").replace(
     /\/+$/,
     "",

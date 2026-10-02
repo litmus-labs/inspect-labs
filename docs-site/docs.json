@@ -27,7 +27,8 @@
   "navbar": {
     "links": [
       {"label": "Framework", "href": "http://localhost:4321"},
-      {"label": "Paper", "href": "http://localhost:4321/paper/"}
+      {"label": "Paper", "href": "http://localhost:4321/paper/"},
+      {"label": "Source", "href": "https://github.com/litmus-labs/inspect-labs"}
     ]
   },
   "contextual": {
