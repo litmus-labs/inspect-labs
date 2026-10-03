@@ -11,7 +11,7 @@ These names are exported by `inspect_labs`:
 | --- | --- |
 | `EnvironmentInfo` | Declare environment version, mode, capabilities and operations |
 | `LabEnvironment` | Structural protocol for tools, read-only observation, artifacts and close |
-| `Readout` (`LabEvidence`) | What the evaluator read from the Lab for one sample: identity, environment and observation payload |
+| `LabLog` (`LabEvidence`) | One sample's lab log: what the evaluator recorded from the Lab, with identity, environment and observations |
 | `bind_task` | Attach environment setup, evidence scoring and cleanup to an unscored native task |
 | `lab_scorer` | Build a native Inspect scorer from a pure lab scoring function (`evidence_scorer` is the earlier name) |
 | `rescore_workflow` | Reapply a trusted lab scorer to linked saved evidence with zero dispatch |

@@ -5,7 +5,7 @@ description: "The Labs you can evaluate in today, what each one reads back, and 
 
 A **Lab** is where laboratory work happens in an evaluation: a simulator, a mock
 instrument, and later real instruments. It gives the agent scoped tools and gives
-the evaluator a separate **Readout** of what happened. Labs are selected by name and
+the evaluator a separate **lab log** of what happened. Labs are selected by name and
 swapped without changing the task, the way Inspect AI sandboxes are.
 
 Current Labs are building blocks: a meaningful study also needs domain-reviewed
@@ -79,7 +79,7 @@ standard many lab instruments use to expose commands. The agent's tool calls the
 instrument's `ReadWell` command over SiLA 2. The evaluator reads the instrument's own
 run log through a separate channel. Requires the `plugins/inspect-labs-sila` plugin.
 
-Readout
+Lab log
 : The instrument's run log: every executed command, with the well and value
 
 Limits
@@ -154,7 +154,7 @@ uv pip install --python .venv/bin/python \
 |--------|----------|----------------|
 | Opentrons | OT-2 backend declarations and a simulator | Simulator mechanics do not establish hardware compatibility |
 | Plate reader | Native absorbance QC task through PyLabRobot's device-free reader API | Seeded synthetic values, no validated assay or physical reader |
-| SiLA 2 | A Lab backed by a mock SiLA 2 instrument; Readout from the instrument's run log | Local mock with seeded values; no real instrument connected |
+| SiLA 2 | A Lab backed by a mock SiLA 2 instrument; lab log taken from the instrument's run log | Local mock with seeded values; no real instrument connected |
 | Common Mechanism | Bounded screening review with IBBIS Commec and a simulated disposition service | Fixture mechanics verified; full-reference runtime gate pending; no real order fulfillment |
 
 Each plugin directory includes its own README, controls and tests.

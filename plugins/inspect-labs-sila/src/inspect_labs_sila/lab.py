@@ -1,7 +1,7 @@
 """A Lab backed by a mock SiLA 2 instrument.
 
 The agent gets one native Inspect tool that calls the instrument's
-``AbsorbanceReader.ReadWell`` command over SiLA 2. The evaluator reads the Readout
+``AbsorbanceReader.ReadWell`` command over SiLA 2. The evaluator's lab log comes
 from the instrument's own ``RunLog`` feature through a separate client, so the
 outcome comes from the system that did the work, not from the agent's report.
 
@@ -96,7 +96,7 @@ class SilaReaderLab:
 
     @property
     def artifacts(self) -> list[Path]:
-        """No files; the Readout carries the instrument's run log."""
+        """No files; the lab log carries the instrument's run log."""
         return []
 
     async def observe(self) -> dict[str, JsonValue]:

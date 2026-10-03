@@ -1,4 +1,4 @@
-"""Native dispatch over SiLA 2, the instrument run log as Readout, and replay boundaries."""
+"""Native dispatch over SiLA 2, the instrument run log as the lab log, and replay boundaries."""
 
 from pathlib import Path
 from unittest.mock import patch

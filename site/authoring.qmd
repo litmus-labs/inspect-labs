@@ -1,6 +1,6 @@
 ---
 title: "Author a laboratory evaluation"
-description: "Bind a native Inspect task to a Lab, its Readout and a pure lab scorer."
+description: "Bind a native Inspect task to a Lab, its lab log and a pure lab scorer."
 ---
 
 Write the Inspect task first. Define the question, sample inputs, agent scaffold,
@@ -76,7 +76,7 @@ definition is `examples/custom_assay.py` in the checkout.
 
 ## Define a lab scorer
 
-A lab scorer accepts `(report: str, readout: Readout)` and returns numeric metrics.
+A lab scorer accepts `(report: str, lab_log: LabLog)` and returns numeric metrics.
 Inspect Labs installs it as a native Inspect scorer. It must be pure so the same
 function can rescore saved evidence later. Validate the observation
 schema, provenance and required child records before judging correctness.

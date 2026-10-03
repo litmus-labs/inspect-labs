@@ -20,7 +20,7 @@ If you know Inspect AI, you already know most of Inspect Labs:
 |---|---|---|
 | Task, Sample, Solver, Tool, Scorer, Approver, eval log | Same names | The same Inspect AI objects, unchanged |
 | Sandbox: where code runs | Embodiment: the robot or simulator | **Lab**: where lab work happens (a simulator, a mock SiLA 2 instrument, later real instruments) |
-| Scorer reads the transcript | Scorer reads the trial record | **Lab scorer** reads the **Readout**: what the evaluator read from the Lab |
+| Scorer reads the transcript | Scorer reads the trial record | **Lab scorer** reads the **lab log**: what the evaluator recorded from the Lab |
 | `inspect_evals` | WorldEvals | **Litmus Labs**: the Labs and evals Litmus maintains |
 
 Inspect Labs runs on native Inspect AI, so a lab eval is an ordinary Inspect task:

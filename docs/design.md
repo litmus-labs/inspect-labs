@@ -10,13 +10,13 @@ No stable public API, physical integration or scientific validity is claimed.
 
 | File | Responsibility | Public surface | Dependencies | Verification |
 |---|---|---|---|---|
-| [Package](../src/inspect_labs/__init__.py) | Public SDK surface | bind_task, lab_scorer, evidence_scorer (earlier name), rescore_workflow, EnvironmentInfo, LabEnvironment, LabEvidence, Readout, check_environment, ConformanceReport | bindings, conformance | Architecture and external-author tests |
+| [Package](../src/inspect_labs/__init__.py) | Public SDK surface | bind_task, lab_scorer, evidence_scorer (earlier name), rescore_workflow, EnvironmentInfo, LabEnvironment, LabEvidence, LabLog, check_environment, ConformanceReport | bindings, conformance | Architecture and external-author tests |
 | [Litmus Labs fixture](../src/inspect_labs/litmus_labs.py) | Bounded synthetic requests and independent observations | Request, Observation, Cancellation, FixtureService, assess_report and specific errors | Pydantic, standard library | [Boundary tests](../tests/test_litmus_labs.py) |
 | [Native measurement](../src/inspect_labs/native.py) | Bind actor tools, native approvals and independent outcome scoring | measurement_task, submit_measurement, read_measurement, fixture_script, observed_result | Inspect AI, Pydantic, litmus_labs | [Native tests](../tests/test_native.py) |
 | [Evidence](../src/inspect_labs/evidence.py) | Bind private provider snapshots to native logs and rescore without execution | EvidenceBundle, persist_evidence, rescore_evidence | Inspect AI, Pydantic, native, litmus_labs, standard library | [Persistence tests](../tests/test_evidence.py) |
 | [CLI](../src/inspect_labs/cli.py) | Installed entry point and explicit live-call admission | main; run, rescore, robot-mock commands | Inspect AI, bindings, tasks, liquid_tasks, evidence, native, litmus_labs, optional robot_mock | [CLI tests](../tests/test_cli.py) |
 | [Robot baseline](../src/inspect_labs/robot_mock.py) | Explicit upstream scripted CubePick baseline | run_mock | Optional pinned Inspect Robots, standard library | [Robot persistence test](../tests/test_robot_mock.py) |
-| [Bindings](../src/inspect_labs/bindings.py) | Reusable native setup, private observation, evidence linking and pure replay | EnvironmentInfo, LabEnvironment, LabEvidence, Readout, bind_task, lab_scorer, evidence_scorer, rescore_workflow | Inspect AI, Pydantic, anyio, errors, spec, standard library | Framework boundary and external-author tests |
+| [Bindings](../src/inspect_labs/bindings.py) | Reusable native setup, private observation, evidence linking and pure replay | EnvironmentInfo, LabEnvironment, LabEvidence, LabLog, bind_task, lab_scorer, evidence_scorer, rescore_workflow | Inspect AI, Pydantic, anyio, errors, spec, standard library | Framework boundary and external-author tests |
 | [Conformance](../src/inspect_labs/conformance.py) | Explicit provider lifecycle checks; declaration-only doctor | ConformanceReport, check_environment, diagnose | Inspect AI, Pydantic, anyio, bindings, plugins, standard library | Conformance tests |
 | [Errors](../src/inspect_labs/errors.py) | Fault taxonomy separating actor, instrument, compatibility and safety failures | LabError, CompatibilityError, InstrumentFault, SafetyAbort | None | Liquid and framework tests |
 | [Spec](../src/inspect_labs/spec.py) | Typed operation declarations and the pre-dispatch compatibility check | ParameterSpec, OperationSpec, Requirements, compatibility_problems | Pydantic | [Liquid tests](../tests/test_liquid.py) |
@@ -119,7 +119,7 @@ the chosen QC thresholds are scientifically meaningful.
 
 The separately installed `inspect-labs-sila` package provides a Lab backed by a mock
 SiLA 2 instrument served on localhost. The agent's tool calls the instrument's
-`AbsorbanceReader.ReadWell` command over SiLA 2. The evaluator reads the Readout from
+`AbsorbanceReader.ReadWell` command over SiLA 2. The evaluator's lab log comes from
 the instrument's own `RunLog` feature through a separate client. Values are seeded
 synthetic controls. This shows the SiLA 2 integration path and evidence mechanics,
 not a connected real instrument or measurement accuracy.
@@ -129,7 +129,7 @@ not a connected real instrument or measurement accuracy.
 | [Exports](../plugins/inspect-labs-sila/src/inspect_labs_sila/__init__.py) | Plugin exports | SilaReaderLab, sila_mock_reader, absorbance_read, read_outcome | lab, tasks | SiLA architecture test |
 | [Features](../plugins/inspect-labs-sila/src/inspect_labs_sila/features.py) | SiLA 2 feature definitions for the agent's command and the evaluator's run log | ABSORBANCE_READER_FDL, RUN_LOG_FDL, absorbance_reader_feature, run_log_feature | sila2 | Native workflow tests |
 | [Instrument](../plugins/inspect-labs-sila/src/inspect_labs_sila/instrument.py) | Mock SiLA 2 server with seeded values and its own run log | MockAbsorbanceReader, SEEDED_ABSORBANCE, UnknownWell | sila2, features | Native workflow and lifecycle tests |
-| [Lab](../plugins/inspect-labs-sila/src/inspect_labs_sila/lab.py) | Agent tool over SiLA 2; evaluator Readout from the run log | SilaReaderLab, sila_mock_reader | sila2, Inspect AI, Labs bindings/spec, Pydantic, anyio, instrument | Conformance, unknown-outcome and replay tests |
+| [Lab](../plugins/inspect-labs-sila/src/inspect_labs_sila/lab.py) | Agent tool over SiLA 2; evaluator lab log from the run log | SilaReaderLab, sila_mock_reader | sila2, Inspect AI, Labs bindings/spec, Pydantic, anyio, instrument | Conformance, unknown-outcome and replay tests |
 | [Task](../plugins/inspect-labs-sila/src/inspect_labs_sila/tasks.py) | Native task, lab scorer and scripted control | absorbance_read, read_outcome, scripted_read, Read | Inspect AI, Pydantic, Labs bindings/tasks, lab | Scripted, model, wrong-report, unknown-well and replay tests |
 
 The plugin's architecture test enforces its inventory and dependency direction.

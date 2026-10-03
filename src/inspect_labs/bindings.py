@@ -109,11 +109,12 @@ class WorkflowEvidence(BaseModel):
     samples: dict[str, LabEvidence]
 
 
-Readout = LabEvidence
-"""What the evaluator read from the Lab for one sample, independently of the agent."""
+LabLog = LabEvidence
+"""One sample's lab log: what the evaluator recorded from the Lab, independently of
+the agent. A run's lab logs are saved together in the ``.labs`` file."""
 
 EvidenceJudge = Callable[[str, LabEvidence], dict[str, int | float]]
-"""Pure outcome function of the agent's report and the Readout. Return ``known=0``
+"""Pure outcome function of the agent's report and the lab log. Return ``known=0``
 only when facts could not be observed; an observed absence of work is a known,
 incorrect outcome. Being pure lets the same function rescore saved evidence."""
 
@@ -384,13 +385,13 @@ def lab_scorer(
 ) -> Scorer:
     """Build a native Inspect scorer from a pure lab scoring function.
 
-    The function receives the agent's report and the Readout. An unknown outcome
+    The function receives the agent's report and the lab log. An unknown outcome
     (failed or empty observation) scores ``known=0`` with every other metric NaN,
     without calling the function.
 
     Args:
-        judge: Pure report/Readout comparison, without provider or model access.
-        evidence: Persisted Readouts for replay; omitted during native execution.
+        judge: Pure report/lab-log comparison, without provider or model access.
+        evidence: Saved lab logs for replay; omitted during native execution.
         metrics: Every key the function may return. Unknown outcomes and omitted keys
             are NaN (unscored), so every sample and epoch has the same keys.
 
@@ -451,7 +452,7 @@ def bind_task(
     Args:
         task: Native Task containing the dataset, solver, approvals and budgets.
         environment: Trusted factory returning a Lab (scoped provider client) per sample.
-        scorer: Pure lab scoring function of the report and the Readout, installed as
+        scorer: Pure lab scoring function of the report and the lab log, installed as
             a native Inspect scorer and reused unchanged for saved-evidence rescore.
         requires: Capabilities, or typed operation requirements, checked against the
             environment declaration before any actor dispatch.
