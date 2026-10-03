@@ -32,7 +32,7 @@ eval log) and adds a few for what Inspect does not cover.
 | **Outcome** | Completed, not completed or unknown. Unknown is never counted as success or failure. | Built |
 | **Lab log** | What the evaluator recorded from the Lab, independently of the agent, saved as the `.labs` file next to the eval log so the run can be rescored later | Built |
 | **Fidelity** | Whether a result came from a simulator, a digital twin or real hardware | Planned |
-| **Action type** | Whether an operation only reads, can be undone, cannot be undone, or leaves the lab | Planned |
+| **Action type** | Whether an operation only reads, can be undone, cannot be undone, or leaves the lab; checked before each action when a task uses an action policy | Built |
 
 Inside adapters, Inspect Labs uses the nouns lab standards already define, such as
 PyLabRobot's deck, labware and well, and SiLA 2's feature, command and property.

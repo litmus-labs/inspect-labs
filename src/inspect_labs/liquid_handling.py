@@ -241,10 +241,12 @@ class LiquidHandlingEnvironment:
                 {"liquid_handling", "volume_tracking", "tip_tracking", "composition_model"}
             ),
             operations={
-                "pick_up_tip": OperationSpec(),
-                "aspirate": OperationSpec(parameters={"volume_ul": volume}),
-                "dispense": OperationSpec(parameters={"volume_ul": volume}),
-                "drop_tip": OperationSpec(),
+                "describe_deck": OperationSpec(action="read"),
+                "read_volume": OperationSpec(action="read"),
+                "pick_up_tip": OperationSpec(action="reversible"),
+                "aspirate": OperationSpec(parameters={"volume_ul": volume}, action="irreversible"),
+                "dispense": OperationSpec(parameters={"volume_ul": volume}, action="irreversible"),
+                "drop_tip": OperationSpec(action="irreversible"),
             },
         )
         # All initialization above is hardware-free and can fail. Acquire last so

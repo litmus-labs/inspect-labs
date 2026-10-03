@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import logging
 import math
 import os
 import re
+import typing
 import warnings
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path, PurePosixPath
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
 
 import anyio
 from inspect_ai import Task, score
@@ -21,9 +23,10 @@ from inspect_ai.hooks import Hooks, RunEnd, SampleInit, SampleScoring, TaskEnd, 
 from inspect_ai.log import list_eval_logs, read_eval_log, read_eval_log_async, write_eval_log
 from inspect_ai.scorer import Score, Scorer, Target, mean, scorer
 from inspect_ai.solver import Generate, Solver, TaskState, chain, solver
-from inspect_ai.tool import Tool
+from inspect_ai.tool import Tool, ToolDef, ToolError
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
+from inspect_labs.actions import Action, ActionPolicy, ActionRecord
 from inspect_labs.errors import CompatibilityError, SafetyAbort
 from inspect_labs.spec import OperationSpec, Requirements, compatibility_problems
 
@@ -94,6 +97,8 @@ class LabEvidence(BaseModel):
     observation_error: str | None = None
     safety_abort: str | None = None
     artifacts: list[ArtifactLink] = Field(default_factory=list)
+    actions: list[ActionRecord] = Field(default_factory=list)
+    """Checked agent actions, in order, when the task was bound with an action policy."""
 
 
 class WorkflowEvidence(BaseModel):
@@ -176,6 +181,7 @@ class _Session:
     metrics: tuple[str, ...]
     evidence: LabEvidence | None = None
     closed: bool = False
+    actions: list[ActionRecord] = field(default_factory=list)
 
 
 # Hook state only: native Inspect owns scheduling, retries, cancellation and scoring.
@@ -236,6 +242,7 @@ async def _observe(sample_uuid: str) -> None:
             payload=payload,
             artifacts=links,
             safety_abort=_safety_abort(session.environment),
+            actions=list(session.actions),
         )
     except Exception as exc:
         # Provider observation is an external boundary. Keep unavailable facts
@@ -248,6 +255,7 @@ async def _observe(sample_uuid: str) -> None:
             payload=None,
             observation_error=error,
             safety_abort=_safety_abort(session.environment),
+            actions=list(session.actions),
         )
     _write_private(session.directory / f"{sample_uuid}.lab-sample", evidence)
     session.evidence = evidence
@@ -435,6 +443,66 @@ evidence_scorer = lab_scorer
 """Earlier name of `lab_scorer`."""
 
 
+Approver = Callable[[Action], bool | Awaitable[bool]]
+"""Called for a held action; returns True only if a person approved it."""
+
+
+def _checked_tool(
+    tool: Tool,
+    session: _Session,
+    policy: ActionPolicy,
+    approver: Approver | None,
+) -> Tool:
+    """Wrap a Lab tool so each call is checked and recorded before it reaches the Lab."""
+    definition = ToolDef(tool)
+    operations = session.info.operations
+
+    async def run(**arguments: Any) -> Any:
+        requested_at = datetime.now(UTC).isoformat()
+        action = Action.of(definition.name, arguments, operations)
+        decision = policy.decide(action, operations)
+        approved: bool | None = None
+        if decision.outcome == "hold":
+            granted = approver(action) if approver is not None else False
+            approved = bool(await granted if inspect.isawaitable(granted) else granted)
+
+        def record(status: Literal["ran", "refused", "error"]) -> None:
+            session.actions.append(
+                ActionRecord(
+                    sequence=len(session.actions) + 1,
+                    requested_at=requested_at,
+                    action=action,
+                    policy_version=policy.version,
+                    decision=decision,
+                    approved=approved,
+                    status=status,
+                )
+            )
+
+        if decision.outcome == "deny" or (decision.outcome == "hold" and not approved):
+            record("refused")
+            why = "needs a person's approval" if decision.outcome == "hold" else "refused"
+            raise ToolError(f"Action {why} by lab policy ({decision.rule}): {decision.reason}")
+        try:
+            result = await tool(**arguments)
+        except BaseException:
+            record("error")
+            raise
+        record("ran")
+        return result
+
+    # Inspect maps tool-call arguments by the function's signature, so the wrapper
+    # presents the original tool's parameters rather than **arguments.
+    run.__signature__ = inspect.signature(tool)  # type: ignore[attr-defined]
+    run.__annotations__ = typing.get_type_hints(tool)
+    return ToolDef(
+        run,
+        name=definition.name,
+        description=definition.description,
+        parameters=definition.parameters,
+    ).as_tool()
+
+
 def bind_task(
     task: Task,
     *,
@@ -446,6 +514,8 @@ def bind_task(
     observation_timeout: float = 30,
     metrics: tuple[str, ...] = DEFAULT_METRICS,
     judge: EvidenceJudge | None = None,
+    action_policy: ActionPolicy | None = None,
+    approver: Approver | None = None,
 ) -> Task:
     """Attach lab tools/evidence to an existing native Task without replacing its solver.
 
@@ -461,6 +531,10 @@ def bind_task(
         observation_timeout: Bound for read-only provider observation, in seconds.
         metrics: Every key the scorer may return; must include known and correct.
         judge: Deprecated alias of ``scorer``.
+        action_policy: Check every Lab tool call before it runs, and record the
+            decision in the lab log. Off when None, as before.
+        approver: Called for actions the policy holds; returns True only if a person
+            approved. Without one, held actions are refused.
 
     Returns:
         The native Task, with setup, scorer and cleanup bindings installed.
@@ -527,10 +601,17 @@ def bind_task(
             if problems:
                 await provider.close()
                 raise CompatibilityError("Unsupported lab requirements: " + "; ".join(problems))
-            _sessions[state.uuid] = _Session(
+            session = _Session(
                 provider, evidence_dir, observation_timeout, attempt, provider.info, keys
             )
-            state.tools = [*state.tools, *provider.tools]
+            _sessions[state.uuid] = session
+            lab_tools = provider.tools
+            if action_policy is not None:
+                lab_tools = [
+                    _checked_tool(lab_tool, session, action_policy, approver)
+                    for lab_tool in lab_tools
+                ]
+            state.tools = [*state.tools, *lab_tools]
             return state
 
         return setup

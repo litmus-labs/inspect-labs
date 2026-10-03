@@ -9,12 +9,13 @@ def test_declared_module_inventory_and_dependencies() -> None:
     source = root / "src" / "inspect_labs"
     assert (source / "py.typed").is_file()
     allowed = {
-        "__init__": {"inspect_labs.bindings", "inspect_labs.conformance"},
+        "__init__": {"inspect_labs.actions", "inspect_labs.bindings", "inspect_labs.conformance"},
         "conformance": {"inspect_ai", "pydantic", "anyio", "inspect_labs.bindings", "inspect_labs"},
         "plugins": set(),
         "devices": set(),
         "errors": set(),
         "spec": {"pydantic"},
+        "actions": {"pydantic", "inspect_labs.spec"},
         "liquid": {"pydantic"},
         "liquid_handling": {
             "inspect_ai",
@@ -65,7 +66,14 @@ def test_declared_module_inventory_and_dependencies() -> None:
             "anyio",
         },
         "robot_mock": {"inspect_robots"},
-        "bindings": {"inspect_ai", "pydantic", "anyio", "inspect_labs.errors", "inspect_labs.spec"},
+        "bindings": {
+            "inspect_ai",
+            "pydantic",
+            "anyio",
+            "inspect_labs.actions",
+            "inspect_labs.errors",
+            "inspect_labs.spec",
+        },
         "environments": {
             "inspect_ai",
             "pydantic",

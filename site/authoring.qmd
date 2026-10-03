@@ -88,6 +88,49 @@ An undeclared metric is an error.
 Choose separate measures for capability, reporting and safeguard effectiveness.
 An agent report, approval verdict or acceptance receipt is not ground truth.
 
+## Check actions before they run
+
+A Lab can declare what each operation does: `read`, `reversible`, `irreversible`, or
+`external` (leaves the lab). Operations are matched to tools by name.
+
+```python
+from inspect_labs.spec import OperationSpec, ParameterSpec
+
+operations = {
+    "read_volume": OperationSpec(action="read"),
+    "dispense": OperationSpec(
+        parameters={"volume_ul": ParameterSpec(unit="uL", minimum=1, maximum=300)},
+        action="irreversible",
+    ),
+}
+```
+
+Pass an action policy to `bind_task`, and every Lab tool call is checked before it
+reaches the Lab:
+
+```python
+from inspect_labs import DEFAULT_ACTION_POLICY, bind_task
+
+evaluation = bind_task(
+    task,
+    environment=make_lab,
+    scorer=my_outcome,
+    requires=frozenset({"liquid_handling"}),
+    evidence_dir=Path(".research/evidence"),
+    action_policy=DEFAULT_ACTION_POLICY,
+    approver=ask_a_person,  # returns True only if a person approves
+)
+```
+
+The default policy allows reads and reversible actions and holds irreversible and
+external actions for a person's approval. Without an approver, held actions are
+refused. An argument outside a declared range, or an operation with no declared
+action type, is always refused. The agent sees the reason as a tool error.
+
+Every decision is recorded in the lab log with its rule, reason, any approval and
+whether the action ran, so a scorer or reviewer can see exactly what was attempted.
+Checks are off unless you pass a policy.
+
 ## Check the binding
 
 Use the conformance check in your provider tests:
