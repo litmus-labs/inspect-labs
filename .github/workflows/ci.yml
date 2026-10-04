@@ -21,16 +21,17 @@ jobs:
           uv python install 3.12
           uv venv --no-project --python 3.12 .venv
           uv pip install --python .venv/bin/python \
-            -e '.[dev,pylabrobot,robots]' \
+            -e '.[dev,pylabrobot,robots,serve]' \
             -e ./plugins/inspect-labs-opentrons \
             -e './plugins/inspect-labs-commec[dev]' \
-            -e ./plugins/inspect-labs-plate-reader
+            -e ./plugins/inspect-labs-plate-reader \
+            -e ./plugins/inspect-labs-sila
       - name: Tests
-        run: .venv/bin/python -m pytest tests plugins/inspect-labs-opentrons/tests plugins/inspect-labs-commec/tests plugins/inspect-labs-plate-reader/tests
+        run: .venv/bin/python -m pytest tests plugins/inspect-labs-opentrons/tests plugins/inspect-labs-commec/tests plugins/inspect-labs-plate-reader/tests plugins/inspect-labs-sila/tests
       - name: Lint and types
         run: |
-          .venv/bin/ruff check src tests examples scripts plugins/inspect-labs-opentrons plugins/inspect-labs-commec plugins/inspect-labs-plate-reader
-          .venv/bin/mypy --strict src/inspect_labs plugins/inspect-labs-opentrons/src plugins/inspect-labs-commec/src plugins/inspect-labs-plate-reader/src
+          .venv/bin/ruff check src tests examples scripts plugins/inspect-labs-opentrons plugins/inspect-labs-commec plugins/inspect-labs-plate-reader plugins/inspect-labs-sila
+          .venv/bin/mypy --strict src/inspect_labs plugins/inspect-labs-opentrons/src plugins/inspect-labs-commec/src plugins/inspect-labs-plate-reader/src plugins/inspect-labs-sila/src
       - name: Installed wheels and native controls
         run: .venv/bin/python scripts/check-installed.py
 
@@ -39,19 +40,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2
         with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: docs-site/package-lock.json
-      - name: Build framework website
+          version: "1.10.18"
+      - name: Render and check the documentation site
         run: |
-          npm --prefix website ci
-          npm --prefix website run check:format
-          npm --prefix website run build
-      - name: Validate documentation
-        working-directory: docs-site
-        run: |
-          npm ci
-          npm run validate
-          npm run check:links
+          quarto render site
+          python3 scripts/check-site.py

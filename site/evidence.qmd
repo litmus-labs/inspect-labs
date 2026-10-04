@@ -1,0 +1,125 @@
+---
+title: "Evidence and replay"
+description: "Keep observed outcomes distinct from actor reports and rescore without dispatching work."
+---
+
+Native `.eval` logs are the primary records of an Inspect evaluation. Inspect Labs
+adds a private `.labs` file, the **lab log**, when a completed run reaches a Lab and
+finishes evidence collection.
+
+## Records
+
+| Record | Contains |
+| --- | --- |
+| `.eval` | Native agent trajectory, tool activity, scores and error status |
+| `.labs` (lab log) | Observations, checked agent actions and their decisions, Lab versions, declared metrics and links to supporting artifacts |
+| `.lab-sample` | Per-sample observations retained before sealing a completed run |
+| Supporting artifacts | Provider ledgers, instrument command records or native robot logs |
+
+Hashes bind the lab log to the native log and supporting files. Since lab log
+schema 3, each sample's action records and observation are also chained: every
+entry is hashed together with the one before it. The chain's final digest is
+stored both in the lab log and in that sample's score in the native `.eval` log.
+Editing, removing or reordering any entry makes rescoring refuse the file.
+
+Hashes detect changed bytes. They do not authenticate a compromised evaluator or
+prove that a source record is truthful. Lab logs written before schema 3 still
+rescore, without the chain check.
+
+An interrupted run may lack a sealed companion. A run refused entirely before
+laboratory dispatch has none. Missing evidence must not be reconstructed by secretly
+repeating the original action.
+
+## Interpret results
+
+Acceptance is not completion. Cancellation acknowledgement is not observed stopping.
+An agent's report is not ground truth.
+
+If observation fails or returns no payload, `known=0` and other outcome metrics are
+unscored. Native Inspect persists NaN as `null`. If complete provider records show no
+completed work, that is a known non-completion, including an idle or refused agent.
+
+Invalid or conflicting provenance is a separate failure. Judges can reject it with
+a native sample error, and replay fails validation when records do not match.
+Not every evidence conflict becomes an unknown score.
+
+Capability, safeguards and workflow validity are different questions. A model may
+fail because it cannot complete the task, because a provider prevented an action, or
+because the outcome could not be observed. Preserve these distinctions in analysis.
+
+## Rescore reference tasks
+
+```bash
+inspect-labs rescore path/to/run.eval \
+  --evidence path/to/run.labs \
+  --output path/to/run.rescored.eval
+```
+
+Use a new output file. The CLI selects a trusted lab scorer for supported reference tasks.
+It verifies identities and links and writes a new native log. It never constructs an
+environment, calls a model or dispatches a provider or robot action.
+
+## Rescore a custom task
+
+Supply its trusted lab scorer explicitly:
+
+```python
+from pathlib import Path
+from inspect_labs import rescore
+from inspect_labs.tasks import measurement_outcome
+
+rescore(
+    Path("run.eval"),
+    Path("run.labs"),
+    Path("run.rescored.eval"),
+    measurement_outcome,
+)
+```
+
+Replace `measurement_outcome` with your task's lab scorer. The caller selects it; evidence
+does not name arbitrary Python modules to import. Samples that errored in the native
+run remain unscored in replay.
+
+## Attach results that arrive later
+
+Some results arrive after the run, for example a measurement that finishes
+overnight. A sample whose result wasn't readable at the end of the run is scored
+unknown. When the result arrives, attach it and rescore:
+
+```bash
+inspect-labs attach path/to/run.labs --sample SAMPLE_UUID \
+  --observation result.json --output path/to/run.late.labs \
+  --note "plate read finished overnight"
+inspect-labs rescore path/to/run.eval --evidence path/to/run.late.labs \
+  --output path/to/run.rescored.eval
+```
+
+`attach` writes a new lab log file; the original is never changed. The late result
+is chained after the existing entries, and rescoring uses the latest one in place of
+the run-time observation. The observation must have the same shape the Lab's
+`observe()` returns. Nothing is run.
+
+## Test a rule change on past runs
+
+To see what changed action rules would have decided for actions already taken,
+replay it against a saved lab log. Nothing is run:
+
+```bash
+inspect-labs replay-rules path/to/run.labs --rules new-rules.json
+```
+
+The rules file is `ActionRules` as JSON. The output lists each action's
+recorded and replayed decision and counts the changes. A lab log that fails its
+hash check is refused. Replay shows what the new rules would have decided, not what
+the agent would have done next, since the agent saw the original decisions.
+
+## Keep records private
+
+Use restrictive directory permissions and keep raw records outside public datasets
+and source control. CLI-created records are owner-readable. Native CLI and SDK
+callers own their log-directory permissions.
+
+Current artifact links use absolute paths. Keep child files at their original paths;
+arbitrary relocation requires explicit rebinding and is not automatically supported.
+Review and sanitize logs before sharing. Native logs may contain private study data,
+provider content and sensitive answers.

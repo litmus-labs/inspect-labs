@@ -5,7 +5,7 @@ from pathlib import Path
 import anyio
 import pytest
 
-from inspect_labs import check_environment
+from inspect_labs import check_lab
 from inspect_labs.environments import HandoffEnvironment, MeasurementEnvironment
 from inspect_labs.litmus_labs import FixtureService, Request
 
@@ -15,7 +15,7 @@ REQUEST = Request(request_id="r1", resource="sample1", values=(2, 3))
 def test_reference_measurement_binding_conforms() -> None:
     service = FixtureService(frozenset({"sample1"}))
     report = anyio.run(
-        check_environment,
+        check_lab,
         lambda: MeasurementEnvironment("run", REQUEST, service),
         lambda: service.submissions,
     )
@@ -28,7 +28,7 @@ def test_reference_handoff_binding_conforms(tmp_path: Path) -> None:
         return int((tmp_path / "delivered-report.bin").exists())
 
     report = anyio.run(
-        check_environment,
+        check_lab,
         lambda: HandoffEnvironment(tmp_path, "report-1", "analysis", b"x"),
         delivered,
     )
@@ -79,7 +79,7 @@ class ObserveFails(MeasurementEnvironment):
 def test_contract_violations_are_named(binding, violation: str) -> None:
     service = FixtureService(frozenset({"sample1"}))
     report = anyio.run(
-        check_environment, lambda: binding("run", REQUEST, service), lambda: service.submissions
+        check_lab, lambda: binding("run", REQUEST, service), lambda: service.submissions
     )
     assert not report.passed
     assert any(item.startswith(violation) for item in report.violations), report.violations
@@ -92,7 +92,7 @@ def test_construction_dispatch_is_named() -> None:
         service.submit("run", REQUEST)
         return MeasurementEnvironment("run", REQUEST, service)
 
-    report = anyio.run(check_environment, eager, lambda: service.submissions)
+    report = anyio.run(check_lab, eager, lambda: service.submissions)
     assert "construction dispatched provider work" in report.violations
 
 
@@ -104,7 +104,7 @@ def test_reference_robot_binding_conforms(tmp_path: Path) -> None:
         return len(list((tmp_path / "robot").glob("*.json")))
 
     report = anyio.run(
-        check_environment,
+        check_lab,
         lambda: RobotHandoffEnvironment(tmp_path, "report-1", "analysis", b"x"),
         rollouts,
     )
@@ -170,14 +170,14 @@ class Timestamped(MeasurementEnvironment):
         (InfoRaises, ["info raised RuntimeError"]),
         (ArtifactsRaise, ["artifacts raised OSError"]),
         (CloseRaises, ["close raised ConnectionError"]),
-        (NoToolsBadInfo, ["info is not an EnvironmentInfo", "no actor tools are declared"]),
+        (NoToolsBadInfo, ["info is not an LabInfo", "no actor tools are declared"]),
         (Undocumented, ["tool 0 is not a documented native Inspect tool"]),
     ],
 )
 def test_provider_exceptions_are_reported_not_raised(binding, expected: list[str]) -> None:
     service = FixtureService(frozenset({"sample1"}))
     report = anyio.run(
-        check_environment, lambda: binding("run", REQUEST, service), lambda: service.submissions
+        check_lab, lambda: binding("run", REQUEST, service), lambda: service.submissions
     )
     for clause in expected:
         assert any(item.startswith(clause) for item in report.violations), report.violations
@@ -189,13 +189,13 @@ def test_factory_failure_and_volatile_keys() -> None:
     def broken():
         raise ValueError("bad config")
 
-    report = anyio.run(check_environment, broken, lambda: 0)
+    report = anyio.run(check_lab, broken, lambda: 0)
     assert report.violations == ("construction raised ValueError",)
     service = FixtureService(frozenset({"sample1"}))
 
     def check(volatile):
         return anyio.run(
-            lambda: check_environment(
+            lambda: check_lab(
                 lambda: Timestamped("run", REQUEST, service),
                 lambda: service.submissions,
                 volatile=volatile,
@@ -206,7 +206,7 @@ def test_factory_failure_and_volatile_keys() -> None:
     assert check(frozenset({"read_at"})).passed
 
 
-@pytest.mark.parametrize("kind", ["environment", "backend"])
+@pytest.mark.parametrize("kind", ["lab", "environment", "backend"])
 def test_doctor_checks_declarations_without_constructing_physical_components(kind: str) -> None:
     from inspect_labs import plugins
     from inspect_labs.conformance import diagnose
@@ -218,3 +218,38 @@ def test_doctor_checks_declarations_without_constructing_physical_components(kin
     report = anyio.run(diagnose, kind, f"physical-doctor-{kind}")
     assert report["ok"]
     assert report["conformance"] == "not_run"
+
+
+def test_lab_is_the_canonical_kind_and_environment_a_legacy_alias() -> None:
+    from inspect_labs import plugins
+
+    @plugins.lab("alias-check-lab")
+    def make_lab(*args):
+        raise AssertionError("registration must not construct")
+
+    assert "alias-check-lab" in plugins.available("lab")
+    assert "alias-check-lab" in plugins.available("environment")
+    assert plugins.factory("environment", "alias-check-lab") is make_lab
+    with pytest.raises(ValueError, match="already registered"):
+        plugins.environment("alias-check-lab")(make_lab)
+    with pytest.raises(ValueError, match="Unknown component kind"):
+        plugins.canonical("sandbox")
+
+
+def test_new_entry_point_group_wins_over_the_legacy_group(monkeypatch) -> None:
+    from importlib.metadata import EntryPoint
+
+    from inspect_labs import plugins
+
+    groups = {
+        "inspect_labs.labs": [EntryPoint("shared", "new_pkg:make", "inspect_labs.labs")],
+        "inspect_labs.environments": [
+            EntryPoint("shared", "old_pkg:make", "inspect_labs.environments"),
+            EntryPoint("legacy-only", "old_pkg:other", "inspect_labs.environments"),
+        ],
+    }
+    monkeypatch.setattr(plugins, "entry_points", lambda group: groups.get(group, []))
+
+    points = plugins._entry_points("lab")
+    assert points["shared"].value == "new_pkg:make"
+    assert points["legacy-only"].value == "old_pkg:other"

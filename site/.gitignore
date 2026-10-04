@@ -1,0 +1,6 @@
+/.quarto/
+/_site/
+/.vercel/
+**/*.quarto_ipynb
+.vercel
+.env*

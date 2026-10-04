@@ -13,8 +13,8 @@ from inspect_ai.log import read_eval_log
 from inspect_ai.model import ChatMessageAssistant, Model, ModelOutput, get_model
 from inspect_ai.tool import ToolCall
 
-from inspect_labs import check_environment, rescore_workflow
-from inspect_labs.bindings import WorkflowEvidence, bind_task
+from inspect_labs import check_lab, rescore
+from inspect_labs.bindings import LabLogFile, connect_lab
 from inspect_labs.errors import CompatibilityError
 from inspect_labs.liquid import (
     CompositionModel,
@@ -145,7 +145,7 @@ def test_environment_conforms_and_constructs_without_dispatch(tmp_path: Path) ->
         backends.append(env.backend)
         return env
 
-    report = anyio.run(check_environment, build, lambda: sum(b.work_commands for b in backends))
+    report = anyio.run(check_lab, build, lambda: sum(b.work_commands for b in backends))
     assert report.passed, report.violations
     assert all(backend.commands == [] for backend in backends)
 
@@ -173,7 +173,7 @@ def test_scripted_controls_score_and_replay_without_dispatch(tmp_path: Path) -> 
             patch.object(SimulatedBackend, "dispense", side_effect=AssertionError("dispatch")),
             patch.object(Model, "generate", side_effect=AssertionError("model call")),
         ):
-            rescore_workflow(native, native.with_suffix(".labs"), tmp_path / f"{name}.eval", judge)
+            rescore(native, native.with_suffix(".labs"), tmp_path / f"{name}.eval", judge)
         assert (
             read_eval_log(str(tmp_path / f"{name}.eval")).samples[0].scores == log.samples[0].scores
         )
@@ -234,9 +234,7 @@ def test_safety_abort_halts_later_samples(tmp_path: Path) -> None:
     first, second = log.samples
     assert "SafetyAbort" in first.error.message
     assert "halted by an earlier safety abort" in second.error.message
-    bundle = WorkflowEvidence.model_validate_json(
-        Path(log.location).with_suffix(".labs").read_text()
-    )
+    bundle = LabLogFile.model_validate_json(Path(log.location).with_suffix(".labs").read_text())
     (record,) = [r for r in bundle.samples.values() if r.safety_abort]
     assert "restricted well source:A6" in record.safety_abort
 
@@ -275,12 +273,12 @@ def test_incompatible_volume_requirement_fails_before_dispatch(tmp_path: Path) -
             )
         },
     )
-    task = bind_task(
+    task = connect_lab(
         Task(name="big-volume", dataset=[Sample(input="x")]),
-        environment=build,
-        judge=worklist_outcome,
+        lab=build,
+        scorer=worklist_outcome,
         requires=needs,
-        evidence_dir=tmp_path / "e",
+        lab_log_dir=tmp_path / "e",
     )
     log = run(task, tmp_path)
     assert log.status == "error"
@@ -303,14 +301,14 @@ def test_real_backends_must_be_declared_physical_and_authorized(tmp_path: Path) 
         LiquidHandlingEnvironment(
             tmp_path / "a", LAYOUT, backend=BackendBinding(_Hardware(), "physical", "star")
         )
-    task = bind_task(
+    task = connect_lab(
         Task(name="physical", dataset=[Sample(input="x")]),
-        environment=lambda state: LiquidHandlingEnvironment(
+        lab=lambda state: LiquidHandlingEnvironment(
             tmp_path / "b", LAYOUT, backend=BackendBinding(_Hardware(), "physical", "ot2")
         ),
-        judge=worklist_outcome,
+        scorer=worklist_outcome,
         requires=frozenset({"liquid_handling"}),
-        evidence_dir=tmp_path / "e",
+        lab_log_dir=tmp_path / "e",
     )
     log = run(task, tmp_path)
     assert log.status == "error"
@@ -348,7 +346,7 @@ def test_registry_names_are_unique_and_lookup_errors_are_clear() -> None:
     from inspect_labs import plugins
 
     assert {"simulator"} <= set(plugins.available("backend"))
-    assert {"liquid-handler", "litmus-measurement"} <= set(plugins.available("environment"))
+    assert {"liquid-handler", "litmus-measurement"} <= set(plugins.available("lab"))
     with pytest.raises(LookupError, match="No backend named 'absent'"):
         plugins.factory("backend", "absent")
     with pytest.raises(ValueError, match="already registered"):
@@ -615,7 +613,7 @@ def test_replay_leaves_errored_and_halted_samples_unscored(tmp_path: Path) -> No
     assert all(sample.error for sample in log.samples)
     native = Path(log.location)
     with patch.object(Model, "generate", side_effect=AssertionError("model call")):
-        rescore_workflow(native, native.with_suffix(".labs"), tmp_path / "r.eval", worklist_outcome)
+        rescore(native, native.with_suffix(".labs"), tmp_path / "r.eval", worklist_outcome)
     replayed = read_eval_log(str(tmp_path / "r.eval"))
     assert [s.scores for s in replayed.samples] == [s.scores for s in log.samples]
     assert [s.error.message for s in replayed.samples] == [s.error.message for s in log.samples]
@@ -771,7 +769,7 @@ def test_replay_keeps_absent_native_results(tmp_path: Path) -> None:
     )
     assert log.status == "error" and log.results is None
     native = Path(log.location)
-    rescore_workflow(native, native.with_suffix(".labs"), tmp_path / "r.eval", worklist_outcome)
+    rescore(native, native.with_suffix(".labs"), tmp_path / "r.eval", worklist_outcome)
     assert read_eval_log(str(tmp_path / "r.eval")).results is None
 
 

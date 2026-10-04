@@ -15,7 +15,7 @@ from inspect_ai.dataset import Sample
 from inspect_ai.solver import generate
 from pydantic import BaseModel
 
-from inspect_labs import LabEvidence, bind_task
+from inspect_labs import LabLog, connect_lab
 from inspect_labs.liquid import (
     DeckLayout,
     Labware,
@@ -41,7 +41,7 @@ class Target(BaseModel):
     reagent: str
 
 
-def reagent_outcome(report: str, evidence: LabEvidence) -> dict[str, int | float]:
+def reagent_outcome(report: str, evidence: LabLog) -> dict[str, int | float]:
     """Target wells hold exactly the reagent volume; the rest of the deck is as expected."""
     facts = LiquidFacts.model_validate_json(json.dumps(evidence.payload))
     target = Target.model_validate(facts.reference)
@@ -101,14 +101,14 @@ def reagent_addition(
         )
 
     volume = ParameterSpec(unit="uL", minimum=volume_ul, maximum=volume_ul)
-    return bind_task(
+    return connect_lab(
         Task(
             dataset=[Sample(id="reagent-addition", input=prompt)],
             solver=scripted_liquid_protocol(calls, "complete") if scripted else generate(),
             message_limit=120,
         ),
-        environment=environment,
-        judge=reagent_outcome,
+        lab=environment,
+        scorer=reagent_outcome,
         requires=Requirements(
             capabilities=frozenset({"liquid_handling"}),
             operations={
@@ -116,6 +116,6 @@ def reagent_addition(
                 "dispense": OperationSpec(parameters={"volume_ul": volume}),
             },
         ),
-        evidence_dir=Path(evidence_dir),
+        lab_log_dir=Path(evidence_dir),
         metrics=METRICS,
     )

@@ -1,26 +1,34 @@
 # Inspect Labs
 
-**Inspect AI evaluations for agents that operate laboratory workflows.**
+**The Inspect AI for laboratory workflows.**
 
-Inspect Labs aims to provide shared evaluation infrastructure for testing
-scientific agents and safeguards across biological software, laboratory
-services and robots. Our first priority is to help researchers test whether
-safeguards prevent biological misuse in practice while allowing legitimate
-research. Robotics is central to extending this work into physical laboratories.
-See the [vision and development path](docs/vision.md).
+Inspect Labs is a framework built on Inspect AI to test and evaluate capabilities
+and safety of agents in autonomous lab workflows. Our first priority is to help
+researchers test whether safeguards prevent biological misuse in practice while
+allowing legitimate research. Robotics is central to extending this work into
+physical laboratories. See the [vision and development path](docs/vision.md).
 
 Write a normal Inspect AI task, choose a model or agent, and let Inspect run it.
-Inspect Labs binds that task to a laboratory service, instrument or simulator,
-checks whether the environment supports the task before dispatch, and scores
-what was observed rather than what the agent claims. Completed native runs with
-saved, linked evidence can be rescored without touching an instrument.
+Inspect Labs binds that task to a **Lab**: a laboratory service, instrument or
+simulator. It checks whether the Lab supports the task before anything runs, and
+scores what the Lab recorded rather than what the agent claims. Saved evidence can
+be rescored later without touching an instrument.
 
-Litmus is the organization; Inspect Labs is the framework; Litmus Labs names the
-environments. Inspect AI owns models, solvers, approvals, limits, logs, scoring
-and `inspect view`. When a workflow has a robot step, Inspect Robots owns that
-policy rollout and its log; lab stacks such as PyLabRobot own instruments.
-Inspect Labs connects their evidence to the laboratory task without replacing
-their execution. Start with [concepts](docs/concepts.md).
+If you know Inspect AI, you already know most of Inspect Labs:
+
+| Inspect AI | Inspect Robots | Inspect Labs |
+|---|---|---|
+| Task, Sample, Solver, Tool, Scorer, Approver, eval log | Same names | The same Inspect AI objects, unchanged |
+| Sandbox: where code runs | Embodiment: the robot or simulator | **Lab**: where lab work happens (a simulator, a mock SiLA 2 instrument, later real instruments) |
+| Scorer reads the transcript | Scorer reads the trial record | **Lab scorer** reads the **lab log**: what the evaluator recorded from the Lab |
+| `inspect_evals` | WorldEvals | **Litmus Labs**: the Labs and evals Litmus maintains |
+
+Inspect Labs runs on native Inspect AI, so a lab eval is an ordinary Inspect task:
+Inspect's model providers, approvals, limits and log viewer work unchanged. When a
+workflow has a robot step, Inspect Robots owns that policy rollout and its log; lab
+stacks such as PyLabRobot and SiLA 2 own instruments. Inspect Labs connects their
+records to the laboratory task without replacing their execution. Litmus is the
+organization that maintains it. Start with [concepts](docs/concepts.md).
 
 ## Install
 
@@ -195,8 +203,8 @@ Pinned upstream dependencies:
 | Inspect Robots | `3c832c34b6c11fa5205ff80ab4947247fedd5eea` | |
 
 Inspect AI, Inspect Robots, PyLabRobot and Opentrons are MIT-licensed, and their
-runtimes remain separate. Website components retain their own
-[upstream notices](website/THIRD_PARTY_NOTICES.md).
+runtimes remain separate. Documentation site components retain their own
+[upstream notices](site/THIRD_PARTY_NOTICES.md).
 ASTRAL and RIDArena are read-only references; no code is copied from them.
 
 ## Development
@@ -204,17 +212,18 @@ ASTRAL and RIDArena are read-only references; no code is copied from them.
 ```bash
 uv venv --no-project --python 3.12 .venv
 uv pip install --python .venv/bin/python \
-  -e '.[dev,pylabrobot,robots]' \
+  -e '.[dev,pylabrobot,robots,serve]' \
   -e ./plugins/inspect-labs-opentrons \
   -e './plugins/inspect-labs-commec[dev]' \
-  -e ./plugins/inspect-labs-plate-reader
-.venv/bin/python -m pytest tests plugins/inspect-labs-opentrons/tests plugins/inspect-labs-commec/tests plugins/inspect-labs-plate-reader/tests
-.venv/bin/ruff check src tests examples scripts plugins/inspect-labs-opentrons plugins/inspect-labs-commec plugins/inspect-labs-plate-reader
-.venv/bin/mypy --strict src/inspect_labs plugins/inspect-labs-opentrons/src plugins/inspect-labs-commec/src plugins/inspect-labs-plate-reader/src
+  -e ./plugins/inspect-labs-plate-reader \
+  -e ./plugins/inspect-labs-sila
+.venv/bin/python -m pytest tests plugins/inspect-labs-opentrons/tests plugins/inspect-labs-commec/tests plugins/inspect-labs-plate-reader/tests plugins/inspect-labs-sila/tests
+.venv/bin/ruff check src tests examples scripts plugins/inspect-labs-opentrons plugins/inspect-labs-commec plugins/inspect-labs-plate-reader plugins/inspect-labs-sila
+.venv/bin/mypy --strict src/inspect_labs plugins/inspect-labs-opentrons/src plugins/inspect-labs-commec/src plugins/inspect-labs-plate-reader/src plugins/inspect-labs-sila/src
 .venv/bin/python scripts/check-installed.py
 ```
 
-The installed check builds all four wheels, installs them into a temporary Python
+The installed check builds all five wheels, installs them into a temporary Python
 environment outside the checkout, and drives native scripted controls plus
 saved-evidence replay. Private logs stay under `.research/runs/installed-smoke-*`.
 The same commands run in CI. These checks need no model API, Docker database or
@@ -223,12 +232,13 @@ instrument; they establish software mechanics only.
 The [source registry](docs/design.md) declares every module's responsibility, public
 surface and allowed dependencies. `tests/test_architecture.py` enforces it.
 
-## Website, documentation and source release
+## Documentation site and source release
 
-The [framework website](website/README.md) explains the laboratory evaluation layer
-with an interactive evidence example, a Reveal.js walkthrough and an embedded
-paper page. The [Mintlify docs](docs-site/README.md) cover the quickstart,
-environment authoring, evidence and public API. Both have local previews.
+The [documentation site](site/README.md) is the project website, as with Inspect AI.
+It covers the quickstart, evaluation model, authoring, each environment with a
+verified run command and its limits, evidence and replay, the public API, the
+Litmus research path and the paper. It is a Quarto site; preview it with
+`quarto preview site`.
 
 This is a source prerelease, not a published PyPI package. The robot extra retains
 a pinned Git dependency, which must be resolved before an index upload. See the

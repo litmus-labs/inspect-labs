@@ -1,0 +1,30 @@
+/*-- scss:defaults --*/
+$body-bg: #ffffff;
+$body-color: #3b3f3e;
+$headings-color: #0f1211;
+$primary: #245e53;
+$link-color: #245e53;
+$border-color: #e5e7e6;
+$navbar-bg: #ffffff;
+$navbar-fg: #3b3f3e;
+$navbar-hl: #0f1211;
+$sidebar-bg: #ffffff;
+$footer-bg: #ffffff;
+$footer-fg: #5c605f;
+$code-block-bg: #f7f8f8;
+$text-muted: #5c605f;
+$callout-color-note: #245e53;
+$callout-color-tip: #245e53;
+$callout-color-important: #245e53;
+$callout-color-warning: #8a5a00;
+$callout-color-caution: #8a5a00;
+
+/*-- scss:rules --*/
+:root {
+  color-scheme: light;
+  --il-ink: #0f1211; --il-ink-2: #3b3f3e; --il-ink-3: #5c605f;
+  --il-panel: #fafbfb; --il-sunk: #f2f4f3;
+  --il-border: #e5e7e6; --il-border-strong: #cfd3d1;
+  --il-accent: #245e53;
+  --il-observed: #1f5c51; --il-unknown: #8a5a00; --il-refused: #a3285a;
+}

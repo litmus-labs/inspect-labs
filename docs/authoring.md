@@ -25,24 +25,24 @@ select its scripted control with `--model mockllm/model -T scripted=true`. Add
 `-T reject=true` for the native approval control. A scripted control is not a model
 capability measurement.
 
-`bind_task` attaches native setup, an outcome scorer and cleanup to an unscored Task.
+`connect_lab` attaches native setup, an outcome scorer and cleanup to an unscored Task.
 It leaves the native solver intact. Replacing the solver with native `eval(...,
 solver=...)` still runs tool preparation and observation collection. References live
 in the task's trusted closure and private evidence, not in actor-facing sample targets.
 
 ## Bind an existing laboratory provider
 
-Implement the structural `LabEnvironment` protocol; inheritance is unnecessary:
+Implement the structural `Lab` protocol; inheritance is unnecessary:
 
 | Surface | Responsibility |
 |---|---|
-| `info: EnvironmentInfo` | Name/version, computation/simulation/physical mode, explicit capabilities |
+| `info: LabInfo` | Name/version, computation/simulation/physical mode, explicit capabilities |
 | `tools: list[Tool]` | Native `@tool` functions calling your existing scoped client |
 | `observe()` | Read authoritative provider/sensor facts into a task-owned JSON payload, or return `None` |
 | `artifacts: list[Path]` | Existing provider records or native child artifacts supporting those facts |
 | `close()` | Release the client; do not equate disconnection with stopping work |
 
-Pass a trusted factory to `bind_task`. It receives native `TaskState`, including the
+Pass a trusted factory to `connect_lab`. It receives native `TaskState`, including the
 sample UUID. Use that identity to scope provider requests and observations. Provider
 construction must not dispatch work. Capability preflight and physical authorization
 are checked before actor tools are installed. `allow_physical=True` is an explicit
@@ -65,9 +65,9 @@ Run the conformance check in your provider's test suite before evaluating with i
 
 ```python
 import anyio
-from inspect_labs import check_environment
+from inspect_labs import check_lab
 
-report = anyio.run(check_environment, make_binding, count_accepted_jobs)
+report = anyio.run(check_lab, make_binding, count_accepted_jobs)
 assert report.passed, report.violations
 ```
 
@@ -89,7 +89,7 @@ about physical behavior.
 
 ## Define an outcome
 
-A pure judge accepts `(report: str, evidence: LabEvidence)` and returns numeric
+A pure judge accepts `(report: str, evidence: LabLog)` and returns numeric
 metrics such as `{"known": 1, "correct": 0}`. `known` reports observation coverage;
 `correct` reports task correctness among observed outcomes. Additional metrics remain
 task-specific.
@@ -105,8 +105,8 @@ depends on the provider's records for the sample being complete; a real adapter 
 state that guarantee or return unknown.
 
 Native metrics and epoch reduction need the same keys on every sample. Declare every
-key your judge can return with `bind_task(..., metrics=("known", "correct", ...))`,
-and pass the same tuple to `rescore_workflow`. The scorer fills unknown outcomes and
+key your judge can return with `connect_lab(..., metrics=("known", "correct", ...))`,
+and pass the same tuple to `rescore`. The scorer fills unknown outcomes and
 omitted keys with NaN. A judge that returns an undeclared key fails that sample
 clearly, instead of breaking reduction for the whole run.
 
@@ -146,21 +146,21 @@ evaluator or make native logs safe for monitors/publication. Keep child files wi
 the evidence. Current links use absolute paths; arbitrary relocation requires
 explicit rebinding and is not automatically supported.
 
-For a custom task, supply its trusted judge explicitly:
+For a custom task, supply its trusted lab scorer explicitly:
 
 ```python
 from pathlib import Path
-from inspect_labs import rescore_workflow
+from inspect_labs import rescore
 from inspect_labs.tasks import measurement_outcome
 
-rescore_workflow(Path("run.eval"), Path("run.labs"),
+rescore(Path("run.eval"), Path("run.labs"),
                  Path("run.rescored.eval"), measurement_outcome)
 ```
 
 Replay constructs no environment and dispatches no provider, robot or model actions.
 It verifies parent and listed child hashes, task/sample identity, and task-owned
 required provenance. The original files remain unchanged. Evidence never names an
-arbitrary Python module for automatic import; the caller selects the judge.
+arbitrary Python module for automatic import; the caller selects the scorer.
 
 Native automatic retries can repeat side effects. A local admission marker keyed
 by Inspect's stable task/sample/epoch identity rejects another attempt before

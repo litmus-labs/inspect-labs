@@ -67,7 +67,7 @@ The contract:
   explicit conformance checks construct components before admission. `doctor` only
   loads factory declarations; it does not construct components or call their lifecycle.
 - **Declarations are honest.** `mode="simulation"` is accepted only for backends known
-  to perform no I/O. Anything else must be `physical`, which `bind_task` refuses
+  to perform no I/O. Anything else must be `physical`, which `connect_lab` refuses
   without the host's `allow_physical=True`. Do not subclass the built-in simulators to
   reach hardware.
 - **Notes are for agents and operators.** They are shown in the agent's deck
@@ -78,7 +78,7 @@ The contract:
 ## Environments
 
 An environment factory takes a private ``directory`` plus keyword options and returns a
-`LabEnvironment`. For a dispatch conformance check, supply a trusted
+`Lab`. For a dispatch conformance check, supply a trusted
 ``dispatch_count`` read from your service, not from the agent. The check compares
 this count across construction, observation and close. A passing check supports
 those tested clauses only. `doctor` does not execute them.
@@ -95,7 +95,7 @@ def test_adapter_declarations_load() -> None:
 
 ```bash
 inspect-labs doctor --backend my-handler
-inspect-labs doctor --environment my-lims
+inspect-labs doctor --lab my-lims
 ```
 
 `doctor` reports:
@@ -108,7 +108,7 @@ inspect-labs doctor --environment my-lims
 
 It does not construct components or invoke observations, tools or shutdown. Plugin
 imports are trusted code and must themselves be free of hardware I/O. For lifecycle
-testing use `check_environment` with an explicitly chosen test instance and a trusted
+testing use `check_lab` with an explicitly chosen test instance and a trusted
 dispatch counter; that check invokes provider methods and is not automatically safe
 for an arbitrary physical adapter.
 

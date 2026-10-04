@@ -13,7 +13,7 @@ from inspect_labs_plate_reader.environment import PlateReaderEnvironment
 from inspect_labs_plate_reader.tasks import METRICS, absorbance_qc, qc_outcome
 from pylabrobot.plate_reading import PlateReader
 
-from inspect_labs.bindings import WorkflowEvidence, rescore_workflow
+from inspect_labs.bindings import LabLogFile, rescore
 
 
 @pytest.mark.parametrize(
@@ -37,7 +37,7 @@ def test_native_qc_control_and_zero_dispatch_replay(case, expected_pass, tmp_pat
             PlateReaderEnvironment, "__init__", side_effect=AssertionError("reader built")
         ),
     ):
-        rescore_workflow(
+        rescore(
             native,
             native.with_suffix(".labs"),
             tmp_path / "replay.eval",
@@ -109,11 +109,11 @@ def test_replay_rejects_mutated_reader_artifact(tmp_path):
         display="none",
     )[0]
     native = Path(log.location)
-    bundle = WorkflowEvidence.model_validate_json(native.with_suffix(".labs").read_text())
+    bundle = LabLogFile.model_validate_json(native.with_suffix(".labs").read_text())
     record = next(iter(bundle.samples.values()))
     Path(record.artifacts[0].path).write_text("{}")
     with pytest.raises(ValueError, match="hash mismatch"):
-        rescore_workflow(
+        rescore(
             native,
             native.with_suffix(".labs"),
             tmp_path / "replay.eval",
@@ -152,7 +152,7 @@ def test_uncertain_backend_attempt_stays_unknown_in_native_scoring_and_replay(tm
     with patch.object(
         PlateReaderEnvironment, "__init__", side_effect=AssertionError("reader built")
     ):
-        rescore_workflow(
+        rescore(
             native,
             native.with_suffix(".labs"),
             tmp_path / "replay.eval",

@@ -1,0 +1,135 @@
+---
+title: "Inspect Labs"
+description: "The Inspect AI for laboratory workflows: a framework built on Inspect AI to test and evaluate capabilities and safety of agents in autonomous lab workflows."
+toc: true
+code-annotations: below
+---
+
+## Welcome
+
+Welcome to Inspect Labs, **the Inspect AI for laboratory workflows**. It is a
+framework built on [Inspect AI](https://inspect.aisi.org.uk/) to test and evaluate
+capabilities and safety of agents in autonomous lab workflows, maintained by Litmus.
+It connects a native Inspect task to a **Lab** and reads back what actually
+happened, so you can check an agent's report against the laboratory rather than its
+own account.
+
+Our first priority is testing whether safeguards
+prevent biological misuse in practice while allowing legitimate research. Robotics,
+through [Inspect Robots](https://github.com/robocurve/inspect-robots), is central to
+extending these evaluations into physical laboratories.
+
+If you know Inspect AI, you already know most of Inspect Labs:
+
+| Inspect AI | Inspect Robots | Inspect Labs |
+|---|---|---|
+| Task, Sample, Solver, Tool, Scorer, Approver, eval log | Same names | The same Inspect AI objects, unchanged |
+| Sandbox: where code runs | Embodiment: the robot or simulator | **Lab**: where lab work happens (a simulator, a mock SiLA 2 instrument, later real instruments) |
+| Scorer reads the transcript | Scorer reads the trial record | **Lab scorer** reads the **lab log**: what the evaluator recorded from the Lab |
+| `inspect_evals` | WorldEvals | **Litmus Labs**: the Labs and evals Litmus maintains |
+
+Inspect Labs runs on native Inspect AI, so a lab eval is an ordinary Inspect task.
+Inspect's model providers, approvals, limits and log viewer work unchanged.
+
+::: {.callout-warning}
+## Early prototype
+The package includes simulated liquid handling, synthetic service workflows and a
+native robot bridge. These establish software mechanics. They do not establish
+scientific validity, physical safety, robot foundation model performance or
+independent researcher adoption. See [Status and limits](status.qmd).
+:::
+
+## Getting started
+
+Install from the source checkout with Python 3.12+ and [uv](https://docs.astral.sh/uv/),
+then run a deterministic liquid-handling control. It needs no model credentials and
+operates no hardware:
+
+```bash
+git clone https://github.com/litmus-labs/inspect-labs.git
+cd inspect-labs
+uv venv --no-project --python 3.12 .venv
+uv pip install --python .venv/bin/python '.[pylabrobot]' # <1>
+source .venv/bin/activate
+
+umask 077 # <2>
+inspect eval inspect_labs/serial_dilution \
+  --model mockllm/model -T scripted=true \
+  -T evidence_dir=.research/dilution-evidence \
+  --log-dir .research/dilution-logs # <3>
+inspect view --log-dir .research/dilution-logs # <4>
+```
+
+1. The `pylabrobot` extra supplies the simulated liquid handler. Robots and
+   provider SDKs are separate extras.
+2. Evidence and logs can hold private study data, so keep them owner-readable.
+3. `inspect_labs/serial_dilution` is a native Inspect task. `scripted=true` selects a
+   deterministic control instead of a model; `evidence_dir` is where the evaluator's
+   independent observations are written.
+4. The native Inspect viewer shows the transcript and scores. The `.labs` companion
+   sits next to the `.eval` log.
+
+Inspect runs the task and opens its native log viewer. Inspect Labs records the final
+deck observations in a linked `.labs` file and scores concentrations, volumes and
+reagent integrity. This checks the software path, not a model's capability.
+
+Continue with the [Quickstart](quickstart.qmd) to modify an example task, rescore its
+saved evidence and evaluate a model.
+
+## What it adds to an Inspect task
+
+An accepted request is not a completed task. A laboratory evaluation needs more than
+the agent's transcript, so Inspect Labs keeps three things separate:
+
+1. **Scoped laboratory tools.** `connect_lab` attaches an environment's tools to a
+   native Inspect task. Declared operations, units and ranges are checked before the
+   agent receives any tool.
+2. **Independent records.** Outcomes are judged from the system that did the work,
+   through a channel the agent cannot write to. Missing observations stay unknown.
+3. **Rescoring without dispatch.** Saved records are linked to the native log by
+   hash. A scorer can be changed and re-applied without calling a model or touching
+   the laboratory.
+
+<figure aria-labelledby="fig1-caption">
+<ol class="flow">
+<li><strong>Task and agent<span class="owner">Inspect AI</span></strong><span>Models, tools, approvals, limits, scoring and logs stay native.</span></li>
+<li><strong>Scoped laboratory tools<span class="owner">Inspect Labs</span></strong><span>Requirements are checked before the agent can act.</span></li>
+<li><strong>The system that does the work<span class="owner">Your stack</span></strong><span>A service, instrument stack, simulator or Inspect Robots trial.</span></li>
+<li><strong>Independent record<span class="owner">Inspect Labs</span></strong><span>Collected from that system, linked to the log by hash.</span></li>
+<li><strong>Outcome<span class="owner">Your lab scorer</span></strong><span><span class="state observed">Known</span> when observed, <span class="state unknown">Unknown</span> when not.</span></li>
+</ol>
+<figcaption id="fig1-caption">Fig. 1. Requests travel to the laboratory; the outcome comes from the system that executed the work, not from the agent's report.</figcaption>
+</figure>
+
+The same agent report can mean different things depending on the laboratory record:
+
+| Case | Agent report | Laboratory record | Outcome |
+|------|--------------|-------------------|---------|
+| Completed | "The measurement completed." | `job.state = completed`, with its result | [Known]{.state .observed} The report can be checked against the result. |
+| Refused | "The measurement completed." | No job exists for the request | [Not executed]{.state .refused} Observed non-execution; the report is wrong. |
+| Unavailable | "The measurement completed." | The service could not be observed | [Unknown]{.state .unknown} Unscored, never counted as success or prevention. |
+
+: Illustrative cases, not model results. An unsuccessful task alone does not prove that a safeguard worked.
+
+## LLM assistance
+
+The site publishes [`llms.txt`](llms.txt) and a Markdown version of every page (`quickstart.llms.md` for the
+Quickstart, and so on) so coding assistants can read the documentation directly. For Inspect AI itself, use its own
+[`llms.txt`](https://inspect.aisi.org.uk/llms.txt).
+
+## Learning more
+
+::: {.cards}
+[**Quickstart**Run a control, modify a task and rescore saved evidence.](quickstart.qmd)
+[**How an evaluation works**The two inputs, the evaluation sequence and observed outcomes.](concepts.qmd)
+[**Author an evaluation**Bind a native task to a Lab and a pure lab scorer.](authoring.qmd)
+[**Labs**What you can evaluate in today, and what each one does not establish.](labs.qmd)
+[**Evidence and replay**The `.labs` companion, its limits and how to rescore.](evidence.qmd)
+[**Research**Why Litmus builds this, and the evidence each stage requires.](research.qmd)
+[**Framework paper**The SPAIS 2026 submission describing the approach and prototype.](paper.qmd)
+:::
+
+Inspect AI owns task execution, models, agents, approvals, limits, scoring and logs.
+Inspect Robots owns robot policies, embodiments, trials and their native records.
+Existing laboratory stacks operate instruments and services. Inspect Labs connects
+these components within a laboratory evaluation.

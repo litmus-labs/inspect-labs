@@ -8,7 +8,14 @@ Units are compared exactly; no conversion is attempted.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+ActionType = Literal["read", "reversible", "irreversible", "external"]
+"""What an operation can change: ``read`` changes nothing; ``reversible`` changes state
+that can be restored; ``irreversible`` uses or changes material; ``external`` leaves
+the lab, for example a job sent to an outside service."""
 
 
 class ParameterSpec(BaseModel):
@@ -27,10 +34,15 @@ class ParameterSpec(BaseModel):
 
 
 class OperationSpec(BaseModel):
-    """A supported operation and its typed parameters."""
+    """A supported operation, its typed parameters and, optionally, its action type.
+
+    Operations are matched to agent tools by name. An operation without an action
+    type is treated as irreversible when actions are checked.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
     parameters: dict[str, ParameterSpec] = Field(default_factory=dict)
+    action: ActionType | None = None
 
 
 class Requirements(BaseModel):

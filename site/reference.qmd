@@ -1,0 +1,82 @@
+---
+title: "Public API and commands"
+description: "The small binding surface around native Inspect tasks."
+---
+
+## Core Python API
+
+These names are exported by `inspect_labs`:
+
+| Name | Purpose |
+| --- | --- |
+| `LabInfo` | Declare environment version, mode, capabilities and operations |
+| `Lab` | Structural protocol for tools, read-only observation, artifacts and close |
+| `LabLog` (`LabLog`) | One sample's lab log: what the evaluator recorded from the Lab, with identity, environment and observations |
+| `connect_lab` | Attach environment setup, evidence scoring and cleanup to an unscored native task |
+| `lab_scorer` | Build a native Inspect scorer from a pure lab scoring function (`evidence_scorer` is the earlier name) |
+| `rescore` | Reapply a trusted lab scorer to linked saved evidence with zero dispatch |
+| `check_lab` | Check lifecycle, tools, observation stability and artifact mechanics |
+| `LabCheckReport` | Report the clauses checked and any violations |
+
+### connect_lab
+
+```python
+def connect_lab(
+    task,
+    *,
+    environment,
+    scorer,
+    requires,
+    evidence_dir,
+    allow_physical=False,
+    observation_timeout=30,
+    metrics=("known", "correct"),
+): ...
+```
+
+The factory receives native `TaskState` and returns a fresh `Lab`.
+`requires` is either a capability set or typed `Requirements` from
+`inspect_labs.spec`. `metrics` must include every key the scorer can return, including
+`known` and `correct`. Existing task scorers are rejected to keep outcome ownership
+explicit.
+
+### rescore
+
+```python
+def rescore(native_log, evidence_file, output, scorer, metrics=None): ...
+```
+
+Paths are `pathlib.Path` objects. The output must not exist. Omitted `metrics` uses
+the keys recorded at binding time. Missing files or provenance mismatches fail
+clearly rather than rerunning the workflow.
+
+## Native execution
+
+Use `inspect eval` for task execution and `inspect view` for native logs. The
+`inspect-labs` CLI is a convenience surface around native execution, discovery and
+replay, not another runner.
+
+```bash
+inspect-labs --help
+inspect-labs list
+inspect-labs doctor --lab litmus-measurement
+inspect-labs run --task measurement --scripted
+inspect-labs rescore run.eval --evidence run.labs --output replay.eval
+inspect-labs replay-rules run.labs --rules new-rules.json
+inspect-labs attach run.labs --sample SAMPLE_UUID --observation result.json --output run.late.labs
+inspect-labs monitor run.eval --evidence run.labs
+inspect-labs serve --lab liquid-handler --lab-log session.json
+```
+
+`run` supports measurement and handoff reference tasks. Other tasks use native
+`inspect eval`. Live `run` requests require explicit `--allow-live`, a model and an
+enforceable `--cost-limit`. `--price INPUT OUTPUT` supplies missing model prices in
+USD per million tokens. A native per-sample limit is not a strict billing cap.
+
+## Upstream documentation
+
+- [Inspect AI](https://inspect.aisi.org.uk/) for tasks, models, agents, tools, approvals and logs
+- [Inspect Robots](https://github.com/robocurve/inspect-robots) for robot policy and embodiment interfaces
+- [PyLabRobot](https://docs.pylabrobot.org/) for laboratory instrument interfaces
+
+The API is provisional. See [status](status.qmd) before depending on it.

@@ -21,7 +21,7 @@ inspect-labs-commec-rescore = "inspect_labs_commec.rescore:main"
 [project.entry-points.inspect_ai]
 inspect_labs_commec = "inspect_labs_commec.tasks"
 
-[project.entry-points."inspect_labs.environments"]
+[project.entry-points."inspect_labs.labs"]
 commec-review = "inspect_labs_commec.environment:review_environment"
 
 [tool.hatch.build.targets.wheel]

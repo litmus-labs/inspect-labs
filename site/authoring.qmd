@@ -1,0 +1,182 @@
+---
+title: "Author a laboratory evaluation"
+description: "Bind a native Inspect task to a Lab, its lab log and a pure lab scorer."
+---
+
+Write the Inspect task first. Define the question, sample inputs, agent scaffold,
+limits and approval policy. Add only the laboratory actions and observations the
+study needs.
+
+## Use an existing example
+
+The checkout includes `examples/custom_assay.py`, an author-owned native task using a
+synthetic measurement service. Run it from the checkout after installation:
+
+```bash
+umask 077
+inspect eval examples/custom_assay.py@custom_assay \
+  --model mockllm/model -T scripted=true \
+  -T evidence_dir=.research/custom-evidence \
+  --log-dir .research/custom-logs
+```
+
+The example changes the requested resource and inputs and uses native approvals.
+Add `-T reject=true` to exercise its approval-rejection control. Copy the example
+into your own study and retain its trusted reference outside actor-facing targets.
+
+`examples/reagent_addition.py` demonstrates a liquid-handling task with a custom
+layout, required operations and task-specific metrics. Both examples use the public
+API without modifying framework source.
+
+## Provide an environment
+
+Implement the structural `Lab` protocol. Inheritance is unnecessary.
+
+| Member | Contract |
+| --- | --- |
+| `info` | `LabInfo` with name, version, mode, capabilities and operations |
+| `tools` | Native Inspect tools that call a scoped existing client |
+| `observe()` | Async, read-only collection of authoritative facts as strict JSON, or `None` |
+| `artifacts` | Supporting provider records and native child logs as paths |
+| `close()` | Async resource release without claiming execution stopped |
+
+Use the native sample UUID to scope actions and observations. Keep credentials in the
+trusted provider client. An actor must not receive the provider object or evaluator
+reference.
+
+## Connect the task to a Lab
+
+`connect_lab` takes an unscored native `Task` and connects it to a Lab. It adds the
+Lab's tools, records the lab log and installs the lab scorer, keeping the task's own
+solver. This is the call used by the measurement example:
+
+```python
+from pathlib import Path
+
+from inspect_labs import connect_lab
+from inspect_labs.environments import MeasurementEnvironment
+from inspect_labs.litmus_labs import FixtureService
+from inspect_labs.tasks import OUTCOME_METRICS, measurement_outcome
+
+# result is the native Task and request is its trusted reference Request.
+evaluation = connect_lab(
+    result,
+    lab=lambda state: MeasurementEnvironment(
+        state.uuid, request, FixtureService(frozenset({"sensor-b"}))
+    ),
+    scorer=measurement_outcome,
+    requires=frozenset({"measurement", "reconcile"}),
+    lab_log_dir=Path(".research/custom-evidence"),
+    metrics=OUTCOME_METRICS,
+)
+```
+
+This excerpt is a recipe, not a standalone task. The complete runnable
+definition is `examples/custom_assay.py` in the checkout.
+
+## Define a lab scorer
+
+A lab scorer accepts `(report: str, lab_log: LabLog)` and returns numeric metrics.
+Inspect Labs installs it as a native Inspect scorer. It must be pure so the same
+function can rescore saved evidence later. Validate the observation
+schema, provenance and required child records before judging correctness.
+
+Declare every returned metric in `connect_lab(..., metrics=(...))`, including `known`
+and `correct`. The binding fills unknown outcomes and omitted metrics with NaN.
+An undeclared metric is an error.
+
+Choose separate measures for capability, reporting and safeguard effectiveness.
+An agent report, approval verdict or acceptance receipt is not ground truth.
+
+## Check actions before they run
+
+A Lab can declare what each operation does: `read`, `reversible`, `irreversible`, or
+`external` (leaves the lab). Operations are matched to tools by name.
+
+```python
+from inspect_labs.spec import OperationSpec, ParameterSpec
+
+operations = {
+    "read_volume": OperationSpec(action="read"),
+    "dispense": OperationSpec(
+        parameters={"volume_ul": ParameterSpec(unit="uL", minimum=1, maximum=300)},
+        action="irreversible",
+    ),
+}
+```
+
+Pass action rules to `connect_lab`, and every Lab tool call is checked before it
+reaches the Lab:
+
+```python
+from inspect_labs import DEFAULT_RULES, connect_lab
+
+evaluation = connect_lab(
+    task,
+    lab=make_lab,
+    scorer=my_outcome,
+    requires=frozenset({"liquid_handling"}),
+    lab_log_dir=Path(".research/evidence"),
+    rules=DEFAULT_RULES,
+    approver=ask_a_person,  # returns True only if a person approves
+)
+```
+
+The default rules allow reads and reversible actions and hold irreversible and
+external actions for a person's approval. Without an approver, held actions are
+refused. An argument outside a declared range, or an operation with no declared
+action type, is always refused. The agent sees the reason as a tool error.
+
+Every decision is recorded in the lab log with its rule, reason, any approval and
+whether the action ran, so a scorer or reviewer can see exactly what was attempted.
+Checks are off unless you pass rules.
+
+## Flag problems with monitors
+
+Monitors are small functions over a sample's lab log that flag problems. Pass them
+to `connect_lab` and their flags go into each score's metadata, so they appear in
+Inspect's log viewer:
+
+```python
+from inspect_labs import DEFAULT_MONITORS
+
+evaluation = connect_lab(..., rules=DEFAULT_RULES, monitors=DEFAULT_MONITORS)
+```
+
+The default monitors flag:
+
+- an irreversible or external action that ran without a recorded approval;
+- an action the rules refused or a person did not approve;
+- an outcome that could not be observed;
+- a final report that disagrees with the lab log (scored `honest=0`).
+
+Run the same monitors on a saved run, without running anything:
+
+```bash
+inspect-labs monitor path/to/run.eval --evidence path/to/run.labs
+```
+
+A monitor is a plain function from a `MonitorInput` to a list of `Flag`s, so you can
+write your own for a study.
+
+## Check the binding
+
+Use the conformance check in your provider tests:
+
+```python
+import anyio
+from inspect_labs import check_lab
+
+# make_binding returns a fresh environment.
+# count_accepted_jobs reads accepted work from the provider's own records.
+report = anyio.run(check_lab, make_binding, count_accepted_jobs)
+assert report.passed, report.violations
+```
+
+It checks for lifecycle dispatch, unusable tools, failed or unstable observations and
+missing artifacts without calling actor tools. Passing verifies those mechanics, not
+the provider's security, declaration truth or scientific validity.
+
+Before a study, test observation loss, contradictory records, rejected requests,
+agent errors and legitimate completion. Have another researcher review the task and
+its scoring. [Evidence guide](evidence.qmd).

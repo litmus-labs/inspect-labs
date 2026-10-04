@@ -1,4 +1,4 @@
-"""Check a provider binding against the LabEnvironment contract before evaluation."""
+"""Check a provider binding against the Lab contract before evaluation."""
 
 from __future__ import annotations
 
@@ -12,10 +12,10 @@ from inspect_ai.tool import ToolDef
 from pydantic import BaseModel, ConfigDict
 
 from inspect_labs import plugins
-from inspect_labs.bindings import EnvironmentInfo, LabEnvironment
+from inspect_labs.bindings import Lab, LabInfo
 
 
-class ConformanceReport(BaseModel):
+class LabCheckReport(BaseModel):
     """Contract violations found for one provider binding; empty means none found."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -28,13 +28,13 @@ class ConformanceReport(BaseModel):
         return not self.violations
 
 
-async def check_environment(
-    factory: Callable[[], LabEnvironment],
+async def check_lab(
+    factory: Callable[[], Lab],
     dispatches: Callable[[], int],
     *,
     volatile: frozenset[str] = frozenset(),
     observation_timeout: float = 30,
-) -> ConformanceReport:
+) -> LabCheckReport:
     """Exercise construction, tool declaration, observation and close without actor calls.
 
     Actor tools are never invoked, so running the check dispatches nothing itself.
@@ -58,7 +58,7 @@ async def check_environment(
     try:
         environment = factory()
     except Exception as exc:
-        return ConformanceReport(
+        return LabCheckReport(
             environment="unconstructed",
             violations=(f"construction raised {type(exc).__name__}",),
         )
@@ -67,10 +67,10 @@ async def check_environment(
     name = type(environment).__name__
     try:
         info = environment.info
-        if isinstance(info, EnvironmentInfo):
+        if isinstance(info, LabInfo):
             name = info.name
         else:
-            violations.append("info is not an EnvironmentInfo declaration")
+            violations.append("info is not an LabInfo declaration")
     except Exception as exc:
         violations.append(f"info raised {type(exc).__name__}")
     try:
@@ -132,7 +132,7 @@ async def check_environment(
         violations.append(f"close raised {type(exc).__name__}")
     if dispatches() != mark:
         violations.append("close dispatched provider work")
-    return ConformanceReport(environment=name, violations=tuple(violations))
+    return LabCheckReport(environment=name, violations=tuple(violations))
 
 
 def _stable(observation: object, volatile: frozenset[str]) -> object:
@@ -141,7 +141,7 @@ def _stable(observation: object, volatile: frozenset[str]) -> object:
     return observation
 
 
-__all__ = ["ConformanceReport", "check_environment", "diagnose"]
+__all__ = ["LabCheckReport", "check_lab", "diagnose"]
 
 
 async def diagnose(kind: str, name: str) -> dict[str, Any]:
@@ -150,20 +150,22 @@ async def diagnose(kind: str, name: str) -> dict[str, Any]:
     Loads the component by name, reports missing runtime requirements with their
     install commands and declared device slots. Importing an installed plugin is
     trusted code; it must not perform I/O at import time. Lifecycle conformance is
-    separate: call `check_environment` explicitly with an appropriate test instance.
+    separate: call `check_lab` explicitly with an appropriate test instance.
 
     Args:
-        kind: ``environment`` or ``backend``.
+        kind: ``lab`` or ``backend`` (``environment`` is accepted as a legacy alias).
         name: Registered component name.
 
     Returns:
         JSON-serializable report; ``ok`` is False when any problem was found.
     """
     report: dict[str, Any] = {"kind": kind, "name": name, "problems": [], "warnings": []}
-    if kind not in plugins.GROUPS:
+    try:
+        component_kind = plugins.canonical(kind)
+    except ValueError:
         report["problems"].append(f"unknown kind {kind!r}")
         return {**report, "ok": False}
-    component_kind: plugins.Kind = "environment" if kind == "environment" else "backend"
+    report["kind"] = component_kind
     try:
         component = plugins.factory(component_kind, name)
     except LookupError as exc:
@@ -184,7 +186,14 @@ async def diagnose(kind: str, name: str) -> dict[str, Any]:
     report["problems"] += [f"missing module {m}: {cmd}" for m, cmd in missing.items()]
     report["conformance"] = "not_run"
     report["warnings"].append(
-        "Declaration checks only; use check_environment with an explicitly selected "
+        "Declaration checks only; use check_lab with an explicitly selected "
         "test instance for lifecycle conformance"
     )
     return {**report, "ok": not report["problems"]}
+
+
+# Earlier names, kept for one release.
+ConformanceReport = LabCheckReport
+"""Earlier name of `LabCheckReport`."""
+check_environment = check_lab
+"""Earlier name of `check_lab`."""
