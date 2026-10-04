@@ -1,0 +1,6 @@
+{
+  "strictness": 2,
+  "commentTypes": ["logic", "syntax"],
+  "instructions": "Review against .github/REVIEW_GUIDE.md. Highest priority: a missing result must stay unknown (null), never a pass or zero; rescoring, replay, monitor and attach must never call a Lab or dispatch an action; every tool call must pass through the shared Gateway and refused actions must never reach the Lab; lab log digests and hash chains must stay verifiable for old files and stable across processes; evaluation and serving must decide identically; no credentials, private evaluation answers or .research content in public files; docs must not claim real-instrument or physical-safety validity beyond simulated tests. Prefer plain, descriptive names. Skip style nits that ruff already enforces.",
+  "ignorePatterns": "site/_site/**\n**/*.pdf\nsite/assets/**\n**/*.png\n**/*.svg\nuv.lock"
+}
