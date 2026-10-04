@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling>=1.25,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "inspect-labs-fictionet"
+version = "0.1.0.dev0"
+description = "Labs for Fictionet's closed simulated internet, for native Inspect evaluations"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = ["inspect-labs"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inspect_labs_fictionet"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "LICENSE", "pyproject.toml"]

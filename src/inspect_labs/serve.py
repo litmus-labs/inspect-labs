@@ -129,6 +129,7 @@ class LabSession:
             observed=record.observation_error is None and record.payload is not None,
             report=None,
             scores={},
+            observation=record.payload,
         )
         log = LabSessionLog(
             lab=self.info.name,

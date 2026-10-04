@@ -23,12 +23,14 @@ env:
     -e ./plugins/inspect-labs-plate-reader
     -e ./plugins/inspect-labs-sila
     -e ./plugins/inspect-labs-ot
+    -e ./plugins/inspect-labs-fictionet
   PLUGIN_TESTS: >-
     plugins/inspect-labs-opentrons/tests
     plugins/inspect-labs-commec/tests
     plugins/inspect-labs-plate-reader/tests
     plugins/inspect-labs-sila/tests
     plugins/inspect-labs-ot/tests
+    plugins/inspect-labs-fictionet/tests
   # Partner simulators the plugins import from a checkout, pinned to tested commits.
   OT_ASSURANCE_LAB_COMMIT: c7361ceb812a8d92b45ebf5cdeb5be794f5bfe15
 

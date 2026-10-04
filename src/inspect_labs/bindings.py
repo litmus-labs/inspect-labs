@@ -515,6 +515,7 @@ def _monitor_input(
         observed=observed,
         report=report,
         scores=scores,
+        observation=record.late_results[-1].payload if record.late_results else record.payload,
     )
 
 
