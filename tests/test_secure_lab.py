@@ -8,7 +8,7 @@ from inspect_ai import eval
 from inspect_ai.log import read_eval_log
 from inspect_ai.model import Model
 
-from inspect_labs.bindings import read_lab_logs, rescore_workflow
+from inspect_labs.bindings import read_lab_logs, rescore
 from inspect_labs.liquid_tasks import worklist_outcome
 from inspect_labs.monitors import DEFAULT_MONITORS
 
@@ -62,7 +62,7 @@ def test_adversarial_round_scores_and_flags_each_scenario(scenario, tmp_path):
         patch.object(Model, "generate", side_effect=AssertionError("model dispatched")),
         patch.object(LiquidHandlingEnvironment, "__init__", side_effect=AssertionError("Lab")),
     ):
-        rescore_workflow(
+        rescore(
             native,
             native.with_suffix(".labs"),
             tmp_path / "rescored.eval",

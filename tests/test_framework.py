@@ -13,7 +13,7 @@ from inspect_ai.model import ChatMessageAssistant, Model, ModelOutput, get_model
 from inspect_ai.solver import solver
 from inspect_ai.tool import ToolCall
 
-from inspect_labs.bindings import EnvironmentInfo, WorkflowEvidence, bind_task, rescore_workflow
+from inspect_labs.bindings import LabInfo, LabLogFile, connect_lab, rescore
 from inspect_labs.environments import MeasurementEnvironment
 from inspect_labs.litmus_labs import FixtureService, Request
 from inspect_labs.tasks import (
@@ -92,7 +92,7 @@ def test_handoff_and_linked_rescore(tmp_path: Path, backend: str) -> None:
     assert next(iter(log.samples[0].scores.values())).value == SUCCESS
     native = Path(log.location)
     bundle_path = native.with_suffix(".labs")
-    bundle = WorkflowEvidence.model_validate_json(bundle_path.read_text())
+    bundle = LabLogFile.model_validate_json(bundle_path.read_text())
     record = next(iter(bundle.samples.values()))
     assert record.payload["observation"]["destination"] == "review"
     if backend == "robot":
@@ -102,11 +102,11 @@ def test_handoff_and_linked_rescore(tmp_path: Path, backend: str) -> None:
         patch.object(FixtureService, "submit", side_effect=AssertionError("dispatch")),
         patch.object(Model, "generate", side_effect=AssertionError("model call")),
     ):
-        rescore_workflow(native, bundle_path, tmp_path / "rescored.eval", handoff_outcome)
+        rescore(native, bundle_path, tmp_path / "rescored.eval", handoff_outcome)
     assert read_eval_log(str(tmp_path / "rescored.eval")).samples[0].scores == log.samples[0].scores
     Path(record.artifacts[0].path).write_bytes(b"changed")
     with pytest.raises(ValueError, match="Child artifact"):
-        rescore_workflow(native, bundle_path, tmp_path / "invalid.eval", handoff_outcome)
+        rescore(native, bundle_path, tmp_path / "invalid.eval", handoff_outcome)
 
 
 def test_native_solver_override_preserves_binding(tmp_path: Path) -> None:
@@ -129,19 +129,19 @@ def test_external_native_task_authoring(tmp_path: Path) -> None:
         dataset=[Sample(id="custom", input="Measure 31+7")],
         solver=scripted_measurement(request),
     )
-    task = bind_task(
+    task = connect_lab(
         native_task,
-        environment=lambda state: MeasurementEnvironment(
+        lab=lambda state: MeasurementEnvironment(
             state.uuid, request, FixtureService(frozenset({"custom-sample"}))
         ),
         scorer=measurement_outcome,
         requires=frozenset({"measurement"}),
-        evidence_dir=tmp_path / "external-evidence",
+        lab_log_dir=tmp_path / "external-evidence",
         metrics=OUTCOME_METRICS,
     )
     log = run_task(task, tmp_path)
     assert next(iter(log.samples[0].scores.values())).value == SUCCESS
-    rescore_workflow(
+    rescore(
         Path(log.location),
         Path(log.location).with_suffix(".labs"),
         tmp_path / "rescored.eval",
@@ -173,7 +173,7 @@ def test_unknown_and_error_lifecycle(tmp_path: Path, case: str) -> None:
     log = run_task(task, tmp_path)
     native = Path(log.location)
     bundle_path = native.with_suffix(".labs")
-    bundle = WorkflowEvidence.model_validate_json(bundle_path.read_text())
+    bundle = LabLogFile.model_validate_json(bundle_path.read_text())
     record = next(iter(bundle.samples.values()))
     score = log.samples[0].scores and next(iter(log.samples[0].scores.values())).value
     if case == "error":
@@ -187,28 +187,26 @@ def test_unknown_and_error_lifecycle(tmp_path: Path, case: str) -> None:
         # Rejection is observed non-completion: the provider has no job for the sample.
         assert record.payload["jobs"] == []
         assert score == {"known": 1, "executed": 0, "answered": 1, "honest": 1, "correct": 0}
-    rescore_workflow(native, bundle_path, tmp_path / "rescored.eval", measurement_outcome)
+    rescore(native, bundle_path, tmp_path / "rescored.eval", measurement_outcome)
     assert read_eval_log(str(tmp_path / "rescored.eval")).status == log.status
 
 
 def test_capability_preflight_prevents_actor_dispatch(tmp_path: Path) -> None:
     class Incompatible(MeasurementEnvironment):
-        info = EnvironmentInfo(
-            name="incompatible", version="1", mode="physical", capabilities=frozenset()
-        )
+        info = LabInfo(name="incompatible", version="1", mode="physical", capabilities=frozenset())
 
     service = FixtureService(frozenset({"sample1"}))
     request = Request(request_id="r1", resource="sample1", values=(2, 3))
-    task = bind_task(
+    task = connect_lab(
         Task(
             name="unsupported",
             dataset=[Sample(input="measure")],
             solver=scripted_measurement(request),
         ),
-        environment=lambda state: Incompatible(state.uuid, request, service),
+        lab=lambda state: Incompatible(state.uuid, request, service),
         scorer=measurement_outcome,
         requires=frozenset({"measurement"}),
-        evidence_dir=tmp_path / "evidence",
+        lab_log_dir=tmp_path / "evidence",
         metrics=OUTCOME_METRICS,
     )
     log = run_task(task, tmp_path)
@@ -218,9 +216,7 @@ def test_capability_preflight_prevents_actor_dispatch(tmp_path: Path) -> None:
 
 def test_empty_or_unlinked_handoff_evidence_is_not_success(tmp_path: Path) -> None:
     log = run_task(handoff(scripted=True, evidence_dir=str(tmp_path / "evidence")), tmp_path)
-    bundle = WorkflowEvidence.model_validate_json(
-        Path(log.location).with_suffix(".labs").read_text()
-    )
+    bundle = LabLogFile.model_validate_json(Path(log.location).with_suffix(".labs").read_text())
     record = next(iter(bundle.samples.values()))
     with pytest.raises(ValueError, match="delivered-data"):
         handoff_outcome("ANSWER: complete", record.model_copy(update={"artifacts": []}))
@@ -242,27 +238,23 @@ def test_observer_timeout_is_preserved_as_unknown(tmp_path: Path) -> None:
             return await super().observe()
 
     request = Request(request_id="r1", resource="sample1", values=(2, 3))
-    task = bind_task(
+    task = connect_lab(
         Task(
             name="slow-observer",
             dataset=[Sample(input="measure")],
             solver=scripted_measurement(request),
         ),
-        environment=lambda state: SlowObserver(
-            state.uuid, request, FixtureService(frozenset({"sample1"}))
-        ),
+        lab=lambda state: SlowObserver(state.uuid, request, FixtureService(frozenset({"sample1"}))),
         scorer=measurement_outcome,
         requires=frozenset({"measurement"}),
-        evidence_dir=tmp_path / "evidence",
+        lab_log_dir=tmp_path / "evidence",
         metrics=OUTCOME_METRICS,
         observation_timeout=0.01,
     )
     log = run_task(task, tmp_path)
     score = next(iter(log.samples[0].scores.values())).value
     assert score["known"] == 0 and unscored(score["correct"])
-    bundle = WorkflowEvidence.model_validate_json(
-        Path(log.location).with_suffix(".labs").read_text()
-    )
+    bundle = LabLogFile.model_validate_json(Path(log.location).with_suffix(".labs").read_text())
     assert next(iter(bundle.samples.values())).observation_error == "TimeoutError"
 
 
@@ -298,7 +290,7 @@ def test_native_eval_set_does_not_repeat_completed_dispatch(
     # Errored attempts emit no native task-end, and the eval-set run end lists only
     # the final retry. Evidence must still be sealed against the dispatching attempt.
     (bundle_path,) = (tmp_path / "native").glob("*.labs")
-    bundle = WorkflowEvidence.model_validate_json(bundle_path.read_text())
+    bundle = LabLogFile.model_validate_json(bundle_path.read_text())
     (record,) = bundle.samples.values()
     assert record.payload["observation"]["value"] == 5
     assert (tmp_path / "evidence" / f"{record.sample_uuid}.lab-sample").is_file()
@@ -307,17 +299,17 @@ def test_native_eval_set_does_not_repeat_completed_dispatch(
         # Native eval-set cleanup deletes the failed attempt's log; replay cannot bind.
         assert not native.exists()
         with pytest.raises(OSError):
-            rescore_workflow(native, bundle_path, tmp_path / "rescored.eval", measurement_outcome)
+            rescore(native, bundle_path, tmp_path / "rescored.eval", measurement_outcome)
         return
     assert [s.uuid for s in read_eval_log(str(native)).samples] == [record.sample_uuid]
     with patch.object(FixtureService, "submit", side_effect=AssertionError("dispatch")):
-        rescore_workflow(native, bundle_path, tmp_path / "rescored.eval", measurement_outcome)
+        rescore(native, bundle_path, tmp_path / "rescored.eval", measurement_outcome)
     assert read_eval_log(str(tmp_path / "rescored.eval")).status == "error"
 
 
 def test_omitted_provenance_is_not_success(tmp_path: Path) -> None:
     log = run_task(measurement(scripted=True, evidence_dir=str(tmp_path / "m")), tmp_path)
-    (record,) = WorkflowEvidence.model_validate_json(
+    (record,) = LabLogFile.model_validate_json(
         Path(log.location).with_suffix(".labs").read_text()
     ).samples.values()
     assert measurement_outcome("ANSWER: 5", record) == SUCCESS
@@ -332,7 +324,7 @@ def test_robot_handoff_requires_every_native_link(tmp_path: Path) -> None:
         handoff(backend="robot", scripted=True, evidence_dir=str(tmp_path / "evidence")),
         tmp_path,
     )
-    (record,) = WorkflowEvidence.model_validate_json(
+    (record,) = LabLogFile.model_validate_json(
         Path(log.location).with_suffix(".labs").read_text()
     ).samples.values()
     assert handoff_outcome("ANSWER: complete", record) == SUCCESS
@@ -379,7 +371,7 @@ def test_native_limit_after_dispatch_keeps_provider_facts(tmp_path: Path) -> Non
     log = run_task(task, tmp_path, solver=continues_after_dispatch(), message_limit=6)
     sample = log.samples[0]
     assert sample.limit is not None and sample.limit.type == "message"
-    (record,) = WorkflowEvidence.model_validate_json(
+    (record,) = LabLogFile.model_validate_json(
         Path(log.location).with_suffix(".labs").read_text()
     ).samples.values()
     assert record.payload["observation"]["value"] == 5
@@ -440,14 +432,14 @@ def test_unknown_epoch_is_unscored_not_dropped(tmp_path: Path) -> None:
             return await super().observe()
 
     request = Request(request_id="r1", resource="sample1", values=(2, 3))
-    task = bind_task(
+    task = connect_lab(
         Task(name="flaky", dataset=[Sample(input="m")], solver=scripted_measurement(request)),
-        environment=lambda state: FlakyObserver(
+        lab=lambda state: FlakyObserver(
             state.uuid, request, FixtureService(frozenset({"sample1"}))
         ),
         scorer=measurement_outcome,
         requires=frozenset({"measurement"}),
-        evidence_dir=tmp_path / "evidence",
+        lab_log_dir=tmp_path / "evidence",
         metrics=OUTCOME_METRICS,
     )
     log = run_task(task, tmp_path, epochs=2, max_samples=1)
@@ -482,7 +474,7 @@ def test_completed_job_under_wrong_request_identity_is_incorrect(tmp_path: Path)
 )
 def test_handoff_misreport_is_not_correct(tmp_path: Path, report: str) -> None:
     log = run_task(handoff(scripted=True, evidence_dir=str(tmp_path / "evidence")), tmp_path)
-    (record,) = WorkflowEvidence.model_validate_json(
+    (record,) = LabLogFile.model_validate_json(
         Path(log.location).with_suffix(".labs").read_text()
     ).samples.values()
     assert handoff_outcome("Done.\n**ANSWER: Complete.**", record) == SUCCESS
@@ -511,14 +503,12 @@ def test_rejected_native_retry_closes_provider_once(tmp_path: Path) -> None:
 
         return solve
 
-    task = bind_task(
+    task = connect_lab(
         Task(name="retry-close", dataset=[Sample(input="m")], solver=fail_after_dispatch()),
-        environment=lambda state: Counted(
-            state.uuid, request, FixtureService(frozenset({"sample1"}))
-        ),
+        lab=lambda state: Counted(state.uuid, request, FixtureService(frozenset({"sample1"}))),
         scorer=measurement_outcome,
         requires=frozenset({"measurement"}),
-        evidence_dir=tmp_path / "evidence",
+        lab_log_dir=tmp_path / "evidence",
         metrics=OUTCOME_METRICS,
     )
     log = run_task(task, tmp_path, retry_on_error=1)
@@ -538,7 +528,7 @@ def test_failed_robot_rollout_is_unknown_not_actor_failure(tmp_path: Path) -> No
             handoff(backend="robot", scripted=True, evidence_dir=str(tmp_path / "evidence")),
             tmp_path,
         )
-    (record,) = WorkflowEvidence.model_validate_json(
+    (record,) = LabLogFile.model_validate_json(
         Path(log.location).with_suffix(".labs").read_text()
     ).samples.values()
     assert record.payload["robot_rollout"] == "failed"
@@ -562,14 +552,14 @@ def test_declared_extra_metrics_survive_unknown_epochs(tmp_path: Path) -> None:
     request = Request(request_id="r1", resource="sample1", values=(2, 3))
 
     def build(metrics):
-        return bind_task(
+        return connect_lab(
             Task(name="extra", dataset=[Sample(input="m")], solver=scripted_measurement(request)),
-            environment=lambda state: FlakyObserver(
+            lab=lambda state: FlakyObserver(
                 state.uuid, request, FixtureService(frozenset({"sample1"}))
             ),
             scorer=judge,
             requires=frozenset({"measurement"}),
-            evidence_dir=tmp_path / str(len(metrics)),
+            lab_log_dir=tmp_path / str(len(metrics)),
             metrics=metrics,
         )
 
@@ -638,13 +628,13 @@ def test_judge_keyword_is_a_deprecated_alias_of_scorer(tmp_path: Path) -> None:
     request = Request(resource="custom-sample", request_id="alias", values=(1, 2))
 
     def build(**outcome):
-        return bind_task(
+        return connect_lab(
             Task(name="alias", dataset=[Sample(input="m")], solver=scripted_measurement(request)),
-            environment=lambda state: MeasurementEnvironment(
+            lab=lambda state: MeasurementEnvironment(
                 state.uuid, request, FixtureService(frozenset({"custom-sample"}))
             ),
             requires=frozenset({"measurement"}),
-            evidence_dir=tmp_path / "alias-evidence",
+            lab_log_dir=tmp_path / "alias-evidence",
             metrics=OUTCOME_METRICS,
             **outcome,
         )
@@ -654,7 +644,7 @@ def test_judge_keyword_is_a_deprecated_alias_of_scorer(tmp_path: Path) -> None:
     log = run_task(task, tmp_path)
     assert next(iter(log.samples[0].scores.values())).value == SUCCESS
     with pytest.warns(DeprecationWarning, match="scorer="):
-        rescore_workflow(
+        rescore(
             Path(log.location),
             Path(log.location).with_suffix(".labs"),
             tmp_path / "alias-rescored.eval",
@@ -664,3 +654,35 @@ def test_judge_keyword_is_a_deprecated_alias_of_scorer(tmp_path: Path) -> None:
         build(scorer=measurement_outcome, judge=measurement_outcome)
     with pytest.raises(TypeError, match="missing required argument 'scorer'"):
         build()
+
+
+def test_earlier_names_still_work_and_warn(tmp_path: Path) -> None:
+    import inspect_labs
+    from inspect_labs import bind_task, rescore_workflow
+
+    assert inspect_labs.LabEnvironment is inspect_labs.Lab
+    assert inspect_labs.EnvironmentInfo is inspect_labs.LabInfo
+    assert inspect_labs.LabEvidence is inspect_labs.LabLog
+    assert inspect_labs.check_environment is inspect_labs.check_lab
+    assert inspect_labs.ConformanceReport is inspect_labs.LabCheckReport
+    request = Request(resource="custom-sample", request_id="earlier", values=(4, 5))
+    with pytest.warns(DeprecationWarning, match="connect_lab"):
+        task = bind_task(
+            Task(name="earlier", dataset=[Sample(input="m")], solver=scripted_measurement(request)),
+            environment=lambda state: MeasurementEnvironment(
+                state.uuid, request, FixtureService(frozenset({"custom-sample"}))
+            ),
+            scorer=measurement_outcome,
+            requires=frozenset({"measurement"}),
+            evidence_dir=tmp_path / "earlier-evidence",
+            metrics=OUTCOME_METRICS,
+        )
+    log = run_task(task, tmp_path)
+    assert next(iter(log.samples[0].scores.values())).value == SUCCESS
+    with pytest.warns(DeprecationWarning, match="rescore"):
+        rescore_workflow(
+            Path(log.location),
+            Path(log.location).with_suffix(".labs"),
+            tmp_path / "earlier-rescored.eval",
+            measurement_outcome,
+        )

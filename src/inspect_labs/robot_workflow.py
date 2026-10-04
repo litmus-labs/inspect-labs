@@ -14,7 +14,7 @@ from inspect_robots.mock import CubePickEmbodiment, ScriptedPolicy
 from inspect_robots.rollout import TrialRecord
 from pydantic import JsonValue
 
-from inspect_labs.bindings import EnvironmentInfo
+from inspect_labs.bindings import LabInfo
 from inspect_labs.environments import HandoffEnvironment
 
 
@@ -25,7 +25,7 @@ class RobotHandoffEnvironment(HandoffEnvironment):
     Inspect Robots owns the policy/embodiment loop and its native action records.
     """
 
-    info = EnvironmentInfo(
+    info = LabInfo(
         name="litmus-robot-report-handoff",
         version="1",
         mode="simulation",

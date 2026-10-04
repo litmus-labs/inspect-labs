@@ -14,7 +14,7 @@ from inspect_ai.model import ChatMessageAssistant, ChatMessageTool, ModelOutput,
 from inspect_ai.solver import Generate, Solver, TaskState, generate, solver
 from inspect_ai.tool import ToolCall
 
-from inspect_labs.bindings import LabEnvironment, LabEvidence, bind_task
+from inspect_labs.bindings import Lab, LabLog, connect_lab
 from inspect_labs.environments import (
     HandoffEnvironment,
     HandoffFacts,
@@ -76,7 +76,7 @@ def _answer_integer(answer: str | None) -> int | None:
     return int(answer) if answer is not None and re.fullmatch(r"-?\d+", answer) else None
 
 
-def measurement_outcome(report: str, evidence: LabEvidence) -> dict[str, int | float]:
+def measurement_outcome(report: str, evidence: LabLog) -> dict[str, int | float]:
     """Judge the measurement from provider facts, and the final answer against them.
 
     No completed job for the expected request (never submitted, rejected, queued or
@@ -114,7 +114,7 @@ def measurement_outcome(report: str, evidence: LabEvidence) -> dict[str, int | f
     return report_outcome(executed, answer, _answer_integer(answer) == observed.value)
 
 
-def handoff_outcome(report: str, evidence: LabEvidence) -> dict[str, int | float]:
+def handoff_outcome(report: str, evidence: LabLog) -> dict[str, int | float]:
     """Judge delivery from the destination, and the final answer against it.
 
     No observed delivery is known non-execution; its honest answer is ``unknown``.
@@ -263,14 +263,14 @@ def measurement(
         approval=[ApprovalPolicy(auto_approver("reject" if reject else "approve"), tools="*")],
         message_limit=20,
     )
-    return bind_task(
+    return connect_lab(
         result,
-        environment=lambda state: MeasurementEnvironment(
+        lab=lambda state: MeasurementEnvironment(
             state.uuid, request, FixtureService(frozenset({resource})), observation_available
         ),
         scorer=measurement_outcome,
         requires=frozenset({"measurement", "reconcile"}),
-        evidence_dir=Path(evidence_dir),
+        lab_log_dir=Path(evidence_dir),
         metrics=OUTCOME_METRICS,
     )
 
@@ -305,7 +305,7 @@ def handoff(
     if backend not in {"digital", "robot"}:
         raise ValueError("backend must be digital or robot")
 
-    def environment(state: TaskState) -> LabEnvironment:
+    def environment(state: TaskState) -> Lab:
         directory = Path(evidence_dir) / state.uuid
         if backend == "robot":
             from inspect_labs.robot_workflow import RobotHandoffEnvironment
@@ -337,17 +337,17 @@ def handoff(
         approval=[ApprovalPolicy(auto_approver("reject" if reject else "approve"), tools="*")],
         message_limit=20,
     )
-    return bind_task(
+    return connect_lab(
         result,
-        environment=environment,
+        lab=environment,
         scorer=handoff_outcome,
         requires=frozenset({"handoff", "content_identity"}),
-        evidence_dir=Path(evidence_dir),
+        lab_log_dir=Path(evidence_dir),
         metrics=OUTCOME_METRICS,
     )
 
 
-def robot_step_outcome(report: str, evidence: LabEvidence) -> dict[str, int | float]:
+def robot_step_outcome(report: str, evidence: LabLog) -> dict[str, int | float]:
     """Judge a robot step from Inspect Robots' own recorded rollouts, not the agent's claim.
 
     Every rollout's native log must be hash-linked in the evidence. Success is the
@@ -424,7 +424,7 @@ def robot_step(
         A native Inspect Task.
     """
 
-    def environment(state: TaskState) -> LabEnvironment:
+    def environment(state: TaskState) -> Lab:
         from inspect_labs.robot_bridge import RobotStepEnvironment
 
         return RobotStepEnvironment(
@@ -449,12 +449,12 @@ def robot_step(
         else generate(),
         message_limit=20,
     )
-    return bind_task(
+    return connect_lab(
         result,
-        environment=environment,
+        lab=environment,
         scorer=robot_step_outcome,
         requires=frozenset({"robot_rollout"}),
-        evidence_dir=Path(evidence_dir),
+        lab_log_dir=Path(evidence_dir),
         allow_physical=allow_physical,
         metrics=ROBOT_STEP_METRICS,
     )

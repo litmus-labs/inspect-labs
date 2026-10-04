@@ -11,9 +11,9 @@ from inspect_ai.model import ChatMessageAssistant, ModelOutput, get_model
 from inspect_ai.solver import generate
 from inspect_ai.tool import ToolCall
 
-from inspect_labs import rescore_workflow
-from inspect_labs.actions import DEFAULT_ACTION_POLICY, Action, ActionPolicy, Rule
-from inspect_labs.bindings import WorkflowEvidence, bind_task
+from inspect_labs import rescore
+from inspect_labs.actions import DEFAULT_RULES, Action, ActionRules, Rule
+from inspect_labs.bindings import LabLogFile, connect_lab
 from inspect_labs.liquid import DeckLayout, Labware, WellContent
 from inspect_labs.spec import OperationSpec, ParameterSpec
 
@@ -39,7 +39,7 @@ LAYOUT = DeckLayout(
 
 def decide(tool, **arguments):
     action = Action.of(tool, arguments, OPERATIONS)
-    return action, DEFAULT_ACTION_POLICY.decide(action, OPERATIONS)
+    return action, DEFAULT_RULES.decide(action, OPERATIONS)
 
 
 @pytest.mark.parametrize(
@@ -64,7 +64,7 @@ def test_default_policy_decisions(tool, arguments, outcome, rule):
 
 
 def test_no_matching_rule_is_refused_and_decisions_are_deterministic():
-    reads_only = ActionPolicy(
+    reads_only = ActionRules(
         version="reads-only",
         rules=(
             Rule(
@@ -101,19 +101,19 @@ STEPS = [
 
 
 def _run(tmp_path, approver):
-    task = bind_task(
+    task = connect_lab(
         Task(dataset=[Sample(input="Move 50 uL")], solver=generate()),
-        environment=lambda state: LiquidHandlingEnvironment(tmp_path / state.uuid, LAYOUT),
+        lab=lambda state: LiquidHandlingEnvironment(tmp_path / state.uuid, LAYOUT),
         scorer=lambda report, lab_log: {"known": 1, "correct": 1},
         requires=frozenset({"liquid_handling"}),
-        evidence_dir=tmp_path / "evidence",
-        action_policy=DEFAULT_ACTION_POLICY,
+        lab_log_dir=tmp_path / "evidence",
+        rules=DEFAULT_RULES,
         approver=approver,
     )
     log = eval(task, model=_calls(STEPS), log_dir=str(tmp_path / "logs"), display="none")[0]
     assert log.status == "success", log.error
     native = Path(log.location)
-    bundle = WorkflowEvidence.model_validate_json(native.with_suffix(".labs").read_text())
+    bundle = LabLogFile.model_validate_json(native.with_suffix(".labs").read_text())
     (sample,) = bundle.samples.values()
     return read_eval_log(str(native)), native, sample.actions
 
@@ -127,7 +127,7 @@ def test_irreversible_action_is_refused_without_approval_and_recorded(tmp_path):
     ]
     assert actions[2].approved is False
     assert [a.sequence for a in actions] == [1, 2, 3]
-    assert all(a.policy_version == DEFAULT_ACTION_POLICY.version for a in actions)
+    assert all(a.rules_version == DEFAULT_RULES.version for a in actions)
     tool_errors = [m.error for m in log.samples[0].messages if m.role == "tool" and m.error]
     assert len(tool_errors) == 1 and "approval" in tool_errors[0].message
 
@@ -150,7 +150,7 @@ def test_approved_irreversible_action_runs_and_records_the_approval(tmp_path):
 
 def test_action_records_survive_rescoring(tmp_path):
     log, native, actions = _run(tmp_path, approver=lambda action: False)
-    rescore_workflow(
+    rescore(
         native,
         native.with_suffix(".labs"),
         tmp_path / "rescored.eval",
@@ -162,16 +162,14 @@ def test_action_records_survive_rescoring(tmp_path):
 
 
 def test_without_a_policy_tools_are_unchanged_and_no_actions_are_recorded(tmp_path):
-    task = bind_task(
+    task = connect_lab(
         Task(dataset=[Sample(input="Move 50 uL")], solver=generate()),
-        environment=lambda state: LiquidHandlingEnvironment(tmp_path / state.uuid, LAYOUT),
+        lab=lambda state: LiquidHandlingEnvironment(tmp_path / state.uuid, LAYOUT),
         scorer=lambda report, lab_log: {"known": 1, "correct": 1},
         requires=frozenset({"liquid_handling"}),
-        evidence_dir=tmp_path / "evidence",
+        lab_log_dir=tmp_path / "evidence",
     )
     log = eval(task, model=_calls(STEPS), log_dir=str(tmp_path / "logs"), display="none")[0]
-    bundle = WorkflowEvidence.model_validate_json(
-        Path(log.location).with_suffix(".labs").read_text()
-    )
+    bundle = LabLogFile.model_validate_json(Path(log.location).with_suffix(".labs").read_text())
     assert next(iter(bundle.samples.values())).actions == []
     assert not any(m.role == "tool" and m.error for m in log.samples[0].messages)

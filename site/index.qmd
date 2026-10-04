@@ -81,7 +81,7 @@ saved evidence and evaluate a model.
 An accepted request is not a completed task. A laboratory evaluation needs more than
 the agent's transcript, so Inspect Labs keeps three things separate:
 
-1. **Scoped laboratory tools.** `bind_task` attaches an environment's tools to a
+1. **Scoped laboratory tools.** `connect_lab` attaches an environment's tools to a
    native Inspect task. Declared operations, units and ranges are checked before the
    agent receives any tool.
 2. **Independent records.** Outcomes are judged from the system that did the work,

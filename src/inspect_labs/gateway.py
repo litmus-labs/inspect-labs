@@ -2,7 +2,7 @@
 
 Both modes use the same `Gateway`:
 
-- the evaluation harness (`bind_task(action_policy=...)`) routes each Lab tool call
+- the evaluation harness (`connect_lab(rules=...)`) routes each Lab tool call
   through it;
 - the deployment server (`inspect_labs.gateway_server`) exposes a Lab's tools to any
   agent over MCP and routes each call through it.
@@ -26,7 +26,7 @@ from typing import Literal, TypeVar
 
 from pydantic import JsonValue
 
-from inspect_labs.actions import Action, ActionPolicy, ActionRecord, Decision
+from inspect_labs.actions import Action, ActionRecord, ActionRules, Decision
 from inspect_labs.spec import OperationSpec
 
 T = TypeVar("T")
@@ -41,7 +41,7 @@ class ActionRefused(Exception):
     def __init__(self, record: ActionRecord) -> None:
         decision = record.decision
         why = "needs a person's approval" if decision.outcome == "hold" else "refused"
-        super().__init__(f"Action {why} by lab policy ({decision.rule}): {decision.reason}")
+        super().__init__(f"Action {why} by lab rules ({decision.rule}): {decision.reason}")
         self.record = record
 
 
@@ -50,7 +50,7 @@ class Gateway:
 
     Args:
         operations: The Lab's declared operations, matched to tools by name.
-        policy: The action policy (the rule file).
+        rules: The action rules (the rule file).
         approver: Called for held actions. Without one, held actions are refused.
         records: Where to append action records; a new list when omitted.
     """
@@ -58,12 +58,12 @@ class Gateway:
     def __init__(
         self,
         operations: dict[str, OperationSpec],
-        policy: ActionPolicy,
+        rules: ActionRules,
         approver: Approver | None = None,
         records: list[ActionRecord] | None = None,
     ) -> None:
         self.operations = operations
-        self.policy = policy
+        self.rules = rules
         self.approver = approver
         self.records: list[ActionRecord] = records if records is not None else []
         self.stopped: str | None = None
@@ -76,7 +76,7 @@ class Gateway:
         """The decision for one action, including a stop."""
         if self.stopped is not None:
             return Decision(outcome="deny", rule="stopped", reason=self.stopped)
-        return self.policy.decide(action, self.operations)
+        return self.rules.decide(action, self.operations)
 
     async def run(
         self,
@@ -102,7 +102,7 @@ class Gateway:
                 sequence=len(self.records) + 1,
                 requested_at=requested_at,
                 action=action,
-                policy_version=self.policy.version,
+                rules_version=self.rules.version,
                 decision=decision,
                 approved=approved,
                 status=status,

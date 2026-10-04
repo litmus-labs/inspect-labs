@@ -12,7 +12,7 @@ from inspect_ai.tool import ToolCall
 from inspect_labs_commec.environment import CASES, ReviewEnvironment
 from inspect_labs_commec.tasks import METRICS, review_outcome, screening_review
 
-from inspect_labs.bindings import WorkflowEvidence, rescore_workflow
+from inspect_labs.bindings import LabLogFile, rescore
 
 
 @pytest.mark.parametrize("case", CASES)
@@ -31,7 +31,7 @@ def test_native_workflow_controls_and_replay(case, tmp_path):
         patch("inspect_labs_commec.environment.sandbox", side_effect=AssertionError("sandbox")),
         patch.object(ReviewEnvironment, "__init__", side_effect=AssertionError("provider")),
     ):
-        rescore_workflow(
+        rescore(
             native,
             native.with_suffix(".labs"),
             tmp_path / "replay.eval",
@@ -85,7 +85,7 @@ def test_replay_rejects_missing_required_artifact_link(tmp_path):
         display="none",
     )[0]
     native = Path(log.location)
-    bundle = WorkflowEvidence.model_validate_json(native.with_suffix(".labs").read_text())
+    bundle = LabLogFile.model_validate_json(native.with_suffix(".labs").read_text())
     record = next(iter(bundle.samples.values()))
     record.artifacts = []
     with pytest.raises(ValueError, match="required artifact"):

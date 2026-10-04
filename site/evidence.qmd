@@ -65,10 +65,10 @@ Supply its trusted lab scorer explicitly:
 
 ```python
 from pathlib import Path
-from inspect_labs import rescore_workflow
+from inspect_labs import rescore
 from inspect_labs.tasks import measurement_outcome
 
-rescore_workflow(
+rescore(
     Path("run.eval"),
     Path("run.labs"),
     Path("run.rescored.eval"),
@@ -99,16 +99,16 @@ is chained after the existing entries, and rescoring uses the latest one in plac
 the run-time observation. The observation must have the same shape the Lab's
 `observe()` returns. Nothing is run.
 
-## Test a policy change on past runs
+## Test a rule change on past runs
 
-To see what a changed action policy would have decided for actions already taken,
+To see what changed action rules would have decided for actions already taken,
 replay it against a saved lab log. Nothing is run:
 
 ```bash
-inspect-labs replay-policy path/to/run.labs --policy new-policy.json
+inspect-labs replay-rules path/to/run.labs --rules new-rules.json
 ```
 
-The policy file is an `ActionPolicy` as JSON. The output lists each action's
+The rules file is `ActionRules` as JSON. The output lists each action's
 recorded and replayed decision and counts the changes. A lab log that fails its
 hash check is refused. Replay shows what the new rules would have decided, not what
 the agent would have done next, since the agent saw the original decisions.

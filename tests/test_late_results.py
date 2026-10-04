@@ -13,13 +13,13 @@ from inspect_ai.log import read_eval_log
 from inspect_ai.model import Model, ModelOutput, get_model
 from inspect_ai.solver import generate
 
-from inspect_labs import rescore_workflow
+from inspect_labs import rescore
 from inspect_labs.bindings import (
-    EnvironmentInfo,
-    attach_late_observation,
-    bind_task,
+    LabInfo,
+    attach_late_result,
+    connect_lab,
     read_lab_logs,
-    run_time_digest,
+    run_time_hash,
 )
 from inspect_labs.tasks import final_answer
 
@@ -27,7 +27,7 @@ from inspect_labs.tasks import final_answer
 class SlowInstrument:
     """A Lab whose result is not readable when the run ends (for example, still running)."""
 
-    info = EnvironmentInfo(
+    info = LabInfo(
         name="slow-instrument",
         version="1",
         mode="simulation",
@@ -62,12 +62,12 @@ def outcome(report, lab_log):
 
 @pytest.fixture
 def run(tmp_path):
-    task = bind_task(
+    task = connect_lab(
         Task(dataset=[Sample(input="Report the reading")], solver=generate()),
-        environment=lambda state: SlowInstrument(),
+        lab=lambda state: SlowInstrument(),
         scorer=outcome,
         requires=frozenset({"slow_read"}),
-        evidence_dir=tmp_path / "evidence",
+        lab_log_dir=tmp_path / "evidence",
     )
     model = get_model(
         "mockllm/model", custom_outputs=[ModelOutput.from_content("mockllm/model", "ANSWER: 7")]
@@ -87,45 +87,45 @@ def test_unknown_at_run_time_becomes_known_after_a_late_result(run, tmp_path):
     assert _score(native)["known"] == 0
     original = labs.read_bytes()
     late = tmp_path / "late.labs"
-    attach_late_observation(labs, uuid, {"value": 7}, late, note="plate read finished later")
+    attach_late_result(labs, uuid, {"value": 7}, late, note="plate read finished later")
     assert labs.read_bytes() == original
     built = SlowInstrument.constructed
     with patch.object(Model, "generate", side_effect=AssertionError("model dispatched")):
-        rescore_workflow(native, late, tmp_path / "rescored.eval", outcome)
+        rescore(native, late, tmp_path / "rescored.eval", outcome)
     assert SlowInstrument.constructed == built
     assert _score(tmp_path / "rescored.eval") == {"known": 1, "correct": 1}
     (record,) = read_lab_logs(late).samples.values()
     assert record.observation_error == "TimeoutError"
-    assert [entry.note for entry in record.late_observations] == ["plate read finished later"]
-    assert record.late_observations[0].previous_chain_sha256 == run_time_digest(record)
+    assert [entry.note for entry in record.late_results] == ["plate read finished later"]
+    assert record.late_results[0].previous_chain_sha256 == run_time_hash(record)
 
 
 def test_the_latest_late_result_is_used_and_each_step_is_chained(run, tmp_path):
     native, labs, uuid = run
     first, second = tmp_path / "first.labs", tmp_path / "second.labs"
-    attach_late_observation(labs, uuid, {"value": 3}, first)
-    attach_late_observation(first, uuid, {"value": 7}, second)
-    rescore_workflow(native, second, tmp_path / "rescored.eval", outcome)
+    attach_late_result(labs, uuid, {"value": 3}, first)
+    attach_late_result(first, uuid, {"value": 7}, second)
+    rescore(native, second, tmp_path / "rescored.eval", outcome)
     assert _score(tmp_path / "rescored.eval")["correct"] == 1
 
 
 def test_an_edited_late_result_is_refused(run, tmp_path):
     native, labs, uuid = run
     late = tmp_path / "late.labs"
-    attach_late_observation(labs, uuid, {"value": 3}, late)
+    attach_late_result(labs, uuid, {"value": 3}, late)
     document = json.loads(late.read_text())
-    document["samples"][uuid]["late_observations"][0]["payload"]["value"] = 7
+    document["samples"][uuid]["late_results"][0]["payload"]["value"] = 7
     late.write_text(json.dumps(document))
     with pytest.raises(ValueError, match="Lab log hash mismatch"):
-        rescore_workflow(native, late, tmp_path / "rescored.eval", outcome)
+        rescore(native, late, tmp_path / "rescored.eval", outcome)
 
 
 def test_attach_never_overwrites_and_rejects_unknown_samples(run, tmp_path):
     _, labs, uuid = run
     with pytest.raises(FileExistsError):
-        attach_late_observation(labs, uuid, {"value": 7}, labs)
+        attach_late_result(labs, uuid, {"value": 7}, labs)
     with pytest.raises(ValueError, match="No sample"):
-        attach_late_observation(labs, "not-a-sample", {"value": 7}, tmp_path / "x.labs")
+        attach_late_result(labs, "not-a-sample", {"value": 7}, tmp_path / "x.labs")
 
 
 def test_cli_attach_then_rescore(run, tmp_path):

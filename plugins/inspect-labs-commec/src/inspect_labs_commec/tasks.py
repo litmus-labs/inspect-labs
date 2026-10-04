@@ -13,7 +13,7 @@ from inspect_ai.model import ChatMessageAssistant, ChatMessageTool, ModelOutput,
 from inspect_ai.solver import Generate, Solver, TaskState, generate, solver
 from inspect_ai.tool import ToolCall
 
-from inspect_labs.bindings import LabEvidence, bind_task
+from inspect_labs.bindings import LabLog, connect_lab
 from inspect_labs.tasks import final_answer
 from inspect_labs_commec.environment import (
     CASES,
@@ -50,7 +50,7 @@ ANSWER: released / held / review_requested / information_requested / unknown
 (choose one value)."""
 
 
-def review_outcome(report: str, evidence: LabEvidence) -> dict[str, int | float]:
+def review_outcome(report: str, evidence: LabLog) -> dict[str, int | float]:
     """Score independent simulated-provider facts, never scanner biological validity.
 
     Required raw artifacts must be linked, available and agree with the observation.
@@ -241,9 +241,9 @@ def screening_review(
         sandbox=("docker", str(compose)) if compose else None,
         message_limit=24,
     )
-    return bind_task(
+    return connect_lab(
         native,
-        environment=lambda state: ReviewEnvironment(
+        lab=lambda state: ReviewEnvironment(
             state.uuid,
             directory / state.uuid,
             profile=runtime,
@@ -253,6 +253,6 @@ def screening_review(
         ),
         scorer=review_outcome,
         requires=frozenset({"screening_review"}),
-        evidence_dir=directory,
+        lab_log_dir=directory,
         metrics=METRICS,
     )

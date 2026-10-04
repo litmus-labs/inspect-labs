@@ -21,7 +21,7 @@ from inspect_ai.solver import Generate, Solver, TaskState, generate, solver
 from inspect_ai.tool import ToolCall
 from pydantic import BaseModel, ConfigDict, Field
 
-from inspect_labs.bindings import LabEnvironment, LabEvidence, bind_task
+from inspect_labs.bindings import Lab, LabLog, connect_lab
 from inspect_labs.liquid import (
     DeckLayout,
     Labware,
@@ -128,7 +128,7 @@ def _reagent_reentry(facts: LiquidFacts, reagents: set[str]) -> bool:
     return False
 
 
-def serial_dilution_outcome(report: str, evidence: LabEvidence) -> dict[str, int | float]:
+def serial_dilution_outcome(report: str, evidence: LabLog) -> dict[str, int | float]:
     """Judge target concentrations and volumes, reagent integrity and stray liquid."""
     facts = LiquidFacts.model_validate_json(json.dumps(evidence.payload))
     reference = SerialDilutionReference.model_validate(facts.reference)
@@ -182,7 +182,7 @@ def serial_dilution_outcome(report: str, evidence: LabEvidence) -> dict[str, int
     )
 
 
-def worklist_outcome(report: str, evidence: LabEvidence) -> dict[str, int | float]:
+def worklist_outcome(report: str, evidence: LabLog) -> dict[str, int | float]:
     """Judge the whole deck against the permitted transfers, carryover and restricted access."""
     facts = LiquidFacts.model_validate_json(json.dumps(evidence.payload))
     reference = WorklistReference.model_validate(facts.reference)
@@ -259,7 +259,7 @@ def _environment_factory(
     backend: str,
     backend_args: dict[str, Any] | None,
 ) -> Any:
-    def environment(state: TaskState) -> LabEnvironment:
+    def environment(state: TaskState) -> Lab:
         from inspect_labs.liquid_handling import LiquidHandlingEnvironment
         from inspect_labs.plugins import resolve
 
@@ -395,16 +395,14 @@ def serial_dilution(
         solver=scripted_liquid_protocol(calls, "complete") if scripted else generate(),
         message_limit=200,
     )
-    return bind_task(
+    return connect_lab(
         result,
-        environment=_environment_factory(
-            evidence_dir, layout, policy, reference, backend, backend_args
-        ),
+        lab=_environment_factory(evidence_dir, layout, policy, reference, backend, backend_args),
         scorer=serial_dilution_outcome,
         requires=_volume_requirements(
             min(transfer, final_volume_ul), max(transfer, final_volume_ul)
         ),
-        evidence_dir=Path(evidence_dir),
+        lab_log_dir=Path(evidence_dir),
         metrics=SERIAL_DILUTION_METRICS,
         allow_physical=allow_physical,
     )
@@ -537,16 +535,14 @@ def worklist_transfer(
         solver=scripted_liquid_protocol(calls, "complete") if scripted else generate(),
         message_limit=200,
     )
-    return bind_task(
+    return connect_lab(
         result,
-        environment=_environment_factory(
-            evidence_dir, layout, policy, reference, backend, backend_args
-        ),
+        lab=_environment_factory(evidence_dir, layout, policy, reference, backend, backend_args),
         scorer=worklist_outcome,
         requires=_volume_requirements(
             min(line.volume_ul for line in lines), max(line.volume_ul for line in lines)
         ),
-        evidence_dir=Path(evidence_dir),
+        lab_log_dir=Path(evidence_dir),
         metrics=WORKLIST_METRICS,
         allow_physical=allow_physical,
     )

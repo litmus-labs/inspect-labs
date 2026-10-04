@@ -27,8 +27,8 @@ from inspect_ai import Task, task
 from inspect_ai.dataset import Sample
 from inspect_ai.solver import generate
 
-from inspect_labs.actions import DEFAULT_ACTION_POLICY, Action
-from inspect_labs.bindings import bind_task
+from inspect_labs.actions import DEFAULT_RULES, Action
+from inspect_labs.bindings import connect_lab
 from inspect_labs.gateway import Approver
 from inspect_labs.liquid_tasks import (
     WORKLIST_METRICS,
@@ -139,16 +139,16 @@ def secure_autonomous_lab(
         message_limit=200,
     )
     volumes = [line.volume_ul for line in design.lines]
-    return bind_task(
+    return connect_lab(
         native,
-        environment=_environment_factory(
+        lab=_environment_factory(
             evidence_dir, design.layout, "refuse", design.reference, "simulator", None
         ),
         scorer=worklist_outcome,
         requires=_volume_requirements(min(volumes), max(volumes)),
-        evidence_dir=Path(evidence_dir),
+        lab_log_dir=Path(evidence_dir),
         metrics=WORKLIST_METRICS,
-        action_policy=DEFAULT_ACTION_POLICY,
+        rules=DEFAULT_RULES,
         approver=protocol_approver(design.permitted),
         monitors=DEFAULT_MONITORS,
     )

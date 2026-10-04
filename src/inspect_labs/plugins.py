@@ -78,7 +78,7 @@ class BackendBinding:
     Args:
         backend: The instrument backend object (for example a PyLabRobot backend).
         mode: ``simulation`` or ``physical``. Physical backends require explicit
-            host authorization in `bind_task`.
+            host authorization in `connect_lab`.
         deck: Deck family the backend drives (for example ``ot2``).
         devices: Claimed device identities, keyed by device kind.
         notes: Operating notes shown to agents and operators.
@@ -113,7 +113,7 @@ def register(kind: Kind, name: str) -> Callable[[Callable[..., Any]], Callable[.
 
 
 def lab(name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Register a Lab: a `LabEnvironment` factory taking ``directory`` plus options."""
+    """Register a Lab: a `Lab` factory taking ``directory`` plus options."""
     return register("lab", name)
 
 

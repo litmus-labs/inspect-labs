@@ -20,7 +20,7 @@ from inspect_ai.tool import Tool, ToolError, tool
 from pydantic import JsonValue
 from sila2.client import SilaClient
 
-from inspect_labs.bindings import EnvironmentInfo
+from inspect_labs.bindings import LabInfo
 from inspect_labs.spec import OperationSpec
 from inspect_labs_sila.instrument import SEEDED_ABSORBANCE, MockAbsorbanceReader
 
@@ -37,7 +37,7 @@ class SilaReaderLab:
         values: Seeded absorbance per well.
     """
 
-    info = EnvironmentInfo(
+    info = LabInfo(
         name="sila-mock-reader",
         version="1",
         mode="simulation",

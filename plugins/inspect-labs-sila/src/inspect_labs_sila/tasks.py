@@ -14,7 +14,7 @@ from inspect_ai.solver import Generate, Solver, TaskState, generate, solver
 from inspect_ai.tool import ToolCall
 from pydantic import BaseModel, ConfigDict
 
-from inspect_labs.bindings import LabLog, bind_task
+from inspect_labs.bindings import LabLog, connect_lab
 from inspect_labs.tasks import OUTCOME_METRICS, final_answer, report_outcome
 from inspect_labs_sila.lab import SilaReaderLab
 
@@ -105,11 +105,11 @@ def absorbance_read(
         solver=scripted_read(well) if scripted else generate(),
         message_limit=10,
     )
-    return bind_task(
+    return connect_lab(
         native,
-        environment=lambda state: SilaReaderLab(state.uuid, well=well),
+        lab=lambda state: SilaReaderLab(state.uuid, well=well),
         scorer=read_outcome,
         requires=frozenset({"absorbance_read"}),
-        evidence_dir=Path(evidence_dir).resolve(),
+        lab_log_dir=Path(evidence_dir).resolve(),
         metrics=OUTCOME_METRICS,
     )

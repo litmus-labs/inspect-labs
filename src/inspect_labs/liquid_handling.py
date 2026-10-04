@@ -3,7 +3,7 @@
 PyLabRobot owns the deck model, labware geometry, tip and volume tracking, and the
 instrument backend. By default the backend is a silent simulator that records every
 command that reaches it. A real PyLabRobot backend can be passed instead, but it
-must be declared ``mode="physical"``; `bind_task` then refuses it unless the host
+must be declared ``mode="physical"``; `connect_lab` then refuses it unless the host
 passes ``allow_physical=True``. That flag is not facility authorization.
 """
 
@@ -44,7 +44,7 @@ from pylabrobot.resources.errors import (
     TooLittleVolumeError,
 )
 
-from inspect_labs.bindings import EnvironmentInfo
+from inspect_labs.bindings import LabInfo
 from inspect_labs.devices import DeviceClaim
 from inspect_labs.errors import InstrumentFault, SafetyAbort
 from inspect_labs.liquid import (
@@ -232,7 +232,7 @@ class LiquidHandlingEnvironment:
         self._fault: str | None = None
         self.reference = reference or {}
         volume = ParameterSpec(unit="uL", minimum=0.5, maximum=layout.max_tip_ul)
-        self.info = EnvironmentInfo(
+        self.info = LabInfo(
             name="litmus-liquid-handling",
             version="1",
             mode=binding.mode,

@@ -14,8 +14,8 @@ from inspect_labs_sila.instrument import MockAbsorbanceReader
 from inspect_labs_sila.lab import SilaReaderLab, sila_mock_reader
 from inspect_labs_sila.tasks import absorbance_read, read_outcome
 
-from inspect_labs import check_environment
-from inspect_labs.bindings import bind_task, rescore_workflow
+from inspect_labs import check_lab
+from inspect_labs.bindings import connect_lab, rescore
 from inspect_labs.tasks import OUTCOME_METRICS
 
 
@@ -42,9 +42,7 @@ def test_scripted_read_scores_from_the_run_log_and_replays_without_dispatch(well
         patch.object(SilaReaderLab, "__init__", side_effect=AssertionError("Lab built")),
         patch.object(MockAbsorbanceReader, "start", side_effect=AssertionError("started")),
     ):
-        rescore_workflow(
-            native, native.with_suffix(".labs"), tmp_path / "replay.eval", read_outcome
-        )
+        rescore(native, native.with_suffix(".labs"), tmp_path / "replay.eval", read_outcome)
     replay = read_eval_log(str(tmp_path / "replay.eval"))
     assert replay.samples[0].scores == log.samples[0].scores
 
@@ -91,12 +89,12 @@ class _LostRunLog(SilaReaderLab):
 
 
 def test_an_unreadable_run_log_is_unknown_not_a_failure(tmp_path):
-    task = bind_task(
+    task = connect_lab(
         Task(dataset=[Sample(input="read A2")], solver=generate()),
-        environment=lambda state: _LostRunLog(state.uuid),
+        lab=lambda state: _LostRunLog(state.uuid),
         scorer=read_outcome,
         requires=frozenset({"absorbance_read"}),
-        evidence_dir=tmp_path / "e",
+        lab_log_dir=tmp_path / "e",
         metrics=OUTCOME_METRICS,
     )
     model = _scripted_model(ModelOutput.from_content("mockllm/model", "ANSWER: 0.62"))
@@ -117,5 +115,5 @@ def test_lab_lifecycle_sends_no_instrument_command(tmp_path):
     def dispatches():
         return len(built[-1].instrument.entries()) if built else 0
 
-    report = anyio.run(lambda: check_environment(factory, dispatches))
+    report = anyio.run(lambda: check_lab(factory, dispatches))
     assert report.passed, report.violations

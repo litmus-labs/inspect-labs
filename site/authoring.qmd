@@ -30,11 +30,11 @@ API without modifying framework source.
 
 ## Provide an environment
 
-Implement the structural `LabEnvironment` protocol. Inheritance is unnecessary.
+Implement the structural `Lab` protocol. Inheritance is unnecessary.
 
 | Member | Contract |
 | --- | --- |
-| `info` | `EnvironmentInfo` with name, version, mode, capabilities and operations |
+| `info` | `LabInfo` with name, version, mode, capabilities and operations |
 | `tools` | Native Inspect tools that call a scoped existing client |
 | `observe()` | Async, read-only collection of authoritative facts as strict JSON, or `None` |
 | `artifacts` | Supporting provider records and native child logs as paths |
@@ -44,34 +44,34 @@ Use the native sample UUID to scope actions and observations. Keep credentials i
 trusted provider client. An actor must not receive the provider object or evaluator
 reference.
 
-## Bind the task
+## Connect the task to a Lab
 
-`bind_task` accepts an unscored native `Task`. It attaches setup, observation scoring
-and cleanup while preserving the solver. This is the binding call used by the
-measurement example:
+`connect_lab` takes an unscored native `Task` and connects it to a Lab. It adds the
+Lab's tools, records the lab log and installs the lab scorer, keeping the task's own
+solver. This is the call used by the measurement example:
 
 ```python
 from pathlib import Path
 
-from inspect_labs import bind_task
+from inspect_labs import connect_lab
 from inspect_labs.environments import MeasurementEnvironment
 from inspect_labs.litmus_labs import FixtureService
 from inspect_labs.tasks import OUTCOME_METRICS, measurement_outcome
 
 # result is the native Task and request is its trusted reference Request.
-evaluation = bind_task(
+evaluation = connect_lab(
     result,
-    environment=lambda state: MeasurementEnvironment(
+    lab=lambda state: MeasurementEnvironment(
         state.uuid, request, FixtureService(frozenset({"sensor-b"}))
     ),
     scorer=measurement_outcome,
     requires=frozenset({"measurement", "reconcile"}),
-    evidence_dir=Path(".research/custom-evidence"),
+    lab_log_dir=Path(".research/custom-evidence"),
     metrics=OUTCOME_METRICS,
 )
 ```
 
-This excerpt is a binding recipe, not a standalone task. The complete runnable
+This excerpt is a recipe, not a standalone task. The complete runnable
 definition is `examples/custom_assay.py` in the checkout.
 
 ## Define a lab scorer
@@ -81,7 +81,7 @@ Inspect Labs installs it as a native Inspect scorer. It must be pure so the same
 function can rescore saved evidence later. Validate the observation
 schema, provenance and required child records before judging correctness.
 
-Declare every returned metric in `bind_task(..., metrics=(...))`, including `known`
+Declare every returned metric in `connect_lab(..., metrics=(...))`, including `known`
 and `correct`. The binding fills unknown outcomes and omitted metrics with NaN.
 An undeclared metric is an error.
 
@@ -105,48 +105,48 @@ operations = {
 }
 ```
 
-Pass an action policy to `bind_task`, and every Lab tool call is checked before it
+Pass action rules to `connect_lab`, and every Lab tool call is checked before it
 reaches the Lab:
 
 ```python
-from inspect_labs import DEFAULT_ACTION_POLICY, bind_task
+from inspect_labs import DEFAULT_RULES, connect_lab
 
-evaluation = bind_task(
+evaluation = connect_lab(
     task,
-    environment=make_lab,
+    lab=make_lab,
     scorer=my_outcome,
     requires=frozenset({"liquid_handling"}),
-    evidence_dir=Path(".research/evidence"),
-    action_policy=DEFAULT_ACTION_POLICY,
+    lab_log_dir=Path(".research/evidence"),
+    rules=DEFAULT_RULES,
     approver=ask_a_person,  # returns True only if a person approves
 )
 ```
 
-The default policy allows reads and reversible actions and holds irreversible and
+The default rules allow reads and reversible actions and hold irreversible and
 external actions for a person's approval. Without an approver, held actions are
 refused. An argument outside a declared range, or an operation with no declared
 action type, is always refused. The agent sees the reason as a tool error.
 
 Every decision is recorded in the lab log with its rule, reason, any approval and
 whether the action ran, so a scorer or reviewer can see exactly what was attempted.
-Checks are off unless you pass a policy.
+Checks are off unless you pass rules.
 
 ## Flag problems with monitors
 
 Monitors are small functions over a sample's lab log that flag problems. Pass them
-to `bind_task` and their flags go into each score's metadata, so they appear in
+to `connect_lab` and their flags go into each score's metadata, so they appear in
 Inspect's log viewer:
 
 ```python
 from inspect_labs import DEFAULT_MONITORS
 
-evaluation = bind_task(..., action_policy=DEFAULT_ACTION_POLICY, monitors=DEFAULT_MONITORS)
+evaluation = connect_lab(..., rules=DEFAULT_RULES, monitors=DEFAULT_MONITORS)
 ```
 
 The default monitors flag:
 
 - an irreversible or external action that ran without a recorded approval;
-- an action the policy refused or a person did not approve;
+- an action the rules refused or a person did not approve;
 - an outcome that could not be observed;
 - a final report that disagrees with the lab log (scored `honest=0`).
 
@@ -165,11 +165,11 @@ Use the conformance check in your provider tests:
 
 ```python
 import anyio
-from inspect_labs import check_environment
+from inspect_labs import check_lab
 
 # make_binding returns a fresh environment.
 # count_accepted_jobs reads accepted work from the provider's own records.
-report = anyio.run(check_environment, make_binding, count_accepted_jobs)
+report = anyio.run(check_lab, make_binding, count_accepted_jobs)
 assert report.passed, report.violations
 ```
 

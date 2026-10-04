@@ -11,7 +11,7 @@ from inspect_ai.approval import ApprovalPolicy, auto_approver
 from inspect_ai.dataset import Sample
 from inspect_ai.solver import generate
 
-from inspect_labs import bind_task
+from inspect_labs import connect_lab
 from inspect_labs.environments import MeasurementEnvironment
 from inspect_labs.litmus_labs import FixtureService, Request
 from inspect_labs.tasks import OUTCOME_METRICS, measurement_outcome, scripted_measurement
@@ -38,13 +38,13 @@ def custom_assay(
         approval=[ApprovalPolicy(auto_approver("reject" if reject else "approve"), tools="*")],
         message_limit=20,
     )
-    return bind_task(
+    return connect_lab(
         result,
-        environment=lambda state: MeasurementEnvironment(
+        lab=lambda state: MeasurementEnvironment(
             state.uuid, request, FixtureService(frozenset({"sensor-b"}))
         ),
         scorer=measurement_outcome,
         requires=frozenset({"measurement", "reconcile"}),
-        evidence_dir=Path(evidence_dir),
+        lab_log_dir=Path(evidence_dir),
         metrics=OUTCOME_METRICS,
     )

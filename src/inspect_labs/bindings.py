@@ -28,8 +28,8 @@ from inspect_ai.tool import Tool, ToolDef, ToolError
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_serializer
 
 from inspect_labs.actions import (
-    ActionPolicy,
     ActionRecord,
+    ActionRules,
     ReplayedDecision,
     replay_decisions,
 )
@@ -41,7 +41,7 @@ from inspect_labs.spec import OperationSpec, Requirements, compatibility_problem
 logger = logging.getLogger(__name__)
 
 
-class EnvironmentInfo(BaseModel):
+class LabInfo(BaseModel):
     """A provider's explicit evaluation capabilities, not an execution controller."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -58,7 +58,7 @@ class EnvironmentInfo(BaseModel):
     (simulation: simulator, physical: hardware; none for computation)."""
 
 
-def _with_fidelity(info: EnvironmentInfo) -> EnvironmentInfo:
+def _with_fidelity(info: LabInfo) -> LabInfo:
     """Record fidelity explicitly in the lab log, derived from mode when not declared."""
     if info.fidelity is not None:
         return info
@@ -71,11 +71,11 @@ def _with_fidelity(info: EnvironmentInfo) -> EnvironmentInfo:
         return sorted(capabilities)
 
 
-class LabEnvironment(Protocol):
+class Lab(Protocol):
     """Provider binding owned by one native sample; tools own provider-specific APIs."""
 
     @property
-    def info(self) -> EnvironmentInfo:
+    def info(self) -> LabInfo:
         """Declare evidence mode and capabilities before actor dispatch."""
         ...
 
@@ -98,7 +98,7 @@ class LabEnvironment(Protocol):
         ...
 
 
-def _safety_abort(environment: LabEnvironment) -> str | None:
+def _safety_abort(environment: Lab) -> str | None:
     """Optional provider signal: a ``safety_abort`` reason attribute halts the task."""
     reason = getattr(environment, "safety_abort", None)
     return reason if isinstance(reason, str) and reason else None
@@ -111,7 +111,7 @@ class ArtifactLink(BaseModel):
     sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
-class LateObservation(BaseModel):
+class LateResult(BaseModel):
     """A result that arrived after the run, attached to a sample's lab log."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -122,12 +122,12 @@ class LateObservation(BaseModel):
     """The sample's chain digest just before this entry was attached."""
 
 
-class LabEvidence(BaseModel):
+class LabLog(BaseModel):
     """Task-owned payload collected independently of the actor and native transcript."""
 
     model_config = ConfigDict(extra="forbid")
     sample_uuid: str
-    environment: EnvironmentInfo
+    environment: LabInfo
     collected_at: str
     payload: dict[str, JsonValue] | None
     observation_error: str | None = None
@@ -135,7 +135,7 @@ class LabEvidence(BaseModel):
     artifacts: list[ArtifactLink] = Field(default_factory=list)
     actions: list[ActionRecord] = Field(default_factory=list)
     """Checked agent actions, in order, when the task was bound with an action policy."""
-    late_observations: list[LateObservation] = Field(default_factory=list)
+    late_results: list[LateResult] = Field(default_factory=list)
     """Results attached after the run, oldest first. Scoring uses the latest."""
     chain_sha256: str | None = None
     """Hash chain over this sample's action records, its observation, then any late
@@ -153,7 +153,7 @@ def _chain(digest: str, entries: list[dict[str, Any]]) -> str:
     return digest
 
 
-def run_time_digest(record: LabEvidence) -> str:
+def run_time_hash(record: LabLog) -> str:
     """Chain one sample's action records, in order, then its observation.
 
     This is the digest at the end of the run, also stored in the native log.
@@ -165,7 +165,7 @@ def run_time_digest(record: LabEvidence) -> str:
     ]
     observation = record.model_dump(
         mode="json",
-        exclude={"actions", "late_observations", "chain_sha256"},
+        exclude={"actions", "late_results", "chain_sha256"},
         exclude_defaults=True,
     )
     # Sets have no stable order across processes; sort them explicitly. (Pydantic
@@ -176,37 +176,31 @@ def run_time_digest(record: LabEvidence) -> str:
     return _chain(_CHAIN_START, entries)
 
 
-def lab_log_digest(record: LabEvidence) -> str:
+def lab_log_hash(record: LabLog) -> str:
     """The sample's full chain: the run-time digest, then each late observation.
 
     Each step hashes the previous digest with the next entry's canonical JSON, so
     changing, removing or reordering any entry changes the result.
     """
-    late = [
-        entry.model_dump(mode="json", exclude_defaults=True) for entry in record.late_observations
-    ]
-    return _chain(run_time_digest(record), late)
+    late = [entry.model_dump(mode="json", exclude_defaults=True) for entry in record.late_results]
+    return _chain(run_time_hash(record), late)
 
 
-class WorkflowEvidence(BaseModel):
+class LabLogFile(BaseModel):
     """One native run's private references and observed facts for deterministic rescore."""
 
     model_config = ConfigDict(extra="forbid")
     schema_version: Literal[2, 3] = 3
-    """3 adds per-sample hash chains (`LabEvidence.chain_sha256`); 2 is still read."""
+    """3 adds per-sample hash chains (`LabLog.chain_sha256`); 2 is still read."""
     task: str
     native_sha256: str
     framework_version: str
     inspect_version: str
     metrics: tuple[str, ...] = ("known", "correct")
-    samples: dict[str, LabEvidence]
+    samples: dict[str, LabLog]
 
 
-LabLog = LabEvidence
-"""One sample's lab log: what the evaluator recorded from the Lab, independently of
-the agent. A run's lab logs are saved together in the ``.labs`` file."""
-
-EvidenceJudge = Callable[[str, LabEvidence], dict[str, int | float]]
+EvidenceJudge = Callable[[str, LabLog], dict[str, int | float]]
 """Pure outcome function of the agent's report and the lab log. Return ``known=0``
 only when facts could not be observed; an observed absence of work is a known,
 incorrect outcome. Being pure lets the same function rescore saved evidence."""
@@ -261,13 +255,13 @@ class _Attempt:
 
 @dataclass
 class _Session:
-    environment: LabEnvironment
+    environment: Lab
     directory: Path
     observation_timeout: float
     attempt: _Attempt
-    info: EnvironmentInfo
+    info: LabInfo
     metrics: tuple[str, ...]
-    evidence: LabEvidence | None = None
+    evidence: LabLog | None = None
     closed: bool = False
     actions: list[ActionRecord] = field(default_factory=list)
 
@@ -323,7 +317,7 @@ async def _observe(sample_uuid: str) -> None:
             ArtifactLink(path=str(path.resolve()), sha256=artifact_digest(path))
             for path in session.environment.artifacts
         ]
-        evidence = LabEvidence(
+        evidence = LabLog(
             sample_uuid=sample_uuid,
             environment=_with_fidelity(session.info),
             collected_at=datetime.now(UTC).isoformat(),
@@ -336,7 +330,7 @@ async def _observe(sample_uuid: str) -> None:
         # Provider observation is an external boundary. Keep unavailable facts
         # unknown, and keep potentially sensitive provider exception text private.
         error = type(exc).__name__
-        evidence = LabEvidence(
+        evidence = LabLog(
             sample_uuid=sample_uuid,
             environment=_with_fidelity(session.info),
             collected_at=datetime.now(UTC).isoformat(),
@@ -345,13 +339,13 @@ async def _observe(sample_uuid: str) -> None:
             safety_abort=_safety_abort(session.environment),
             actions=list(session.actions),
         )
-    evidence = evidence.model_copy(update={"chain_sha256": lab_log_digest(evidence)})
+    evidence = evidence.model_copy(update={"chain_sha256": lab_log_hash(evidence)})
     _write_private(session.directory / f"{sample_uuid}.lab-sample", evidence)
     session.evidence = evidence
 
 
-@hooks(name="lab_evidence", description="Collect and link private laboratory workflow evidence")
-class LabEvidenceHooks(Hooks):
+@hooks(name="lab_log", description="Record lab logs and link them to the eval log")
+class LabLogHooks(Hooks):
     """Native lifecycle hooks collect before scoring and seal after native log completion."""
 
     async def on_task_start(self, data: TaskStart) -> None:
@@ -452,7 +446,7 @@ async def _seal(location: str) -> None:
         native_path = Path(location)
         _write_private(
             native_path.with_suffix(".labs"),
-            WorkflowEvidence(
+            LabLogFile(
                 task=log.eval.task,
                 native_sha256=artifact_digest(native_path),
                 framework_version=version("inspect-labs"),
@@ -476,9 +470,9 @@ def _metric_keys(metrics: tuple[str, ...]) -> tuple[str, ...]:
 
 
 def _monitor_input(
-    sample_uuid: str, record: LabEvidence, report: str | None, scores: dict[str, Any]
+    sample_uuid: str, record: LabLog, report: str | None, scores: dict[str, Any]
 ) -> MonitorInput:
-    observed = bool(record.late_observations) or (
+    observed = bool(record.late_results) or (
         record.observation_error is None and record.payload is not None
     )
     return MonitorInput(
@@ -492,7 +486,7 @@ def _monitor_input(
 
 def lab_scorer(
     judge: EvidenceJudge,
-    evidence: dict[str, LabEvidence] | None = None,
+    evidence: dict[str, LabLog] | None = None,
     metrics: tuple[str, ...] = DEFAULT_METRICS,
     monitors: Sequence[Monitor] = (),
 ) -> Scorer:
@@ -532,12 +526,12 @@ def lab_scorer(
                 )
             # Native metrics and epoch reduction need identical keys on every sample.
             # NaN marks a value as unscored; a missing key breaks or drops the metric.
-            if record.late_observations:
+            if record.late_results:
                 # A result that arrived after the run replaces the run-time observation
                 # for scoring; the saved entries themselves are never changed.
                 record = record.model_copy(
                     update={
-                        "payload": record.late_observations[-1].payload,
+                        "payload": record.late_results[-1].payload,
                         "observation_error": None,
                     }
                 )
@@ -593,38 +587,41 @@ def _checked_tool(tool: Tool, gateway: Gateway) -> Tool:
     ).as_tool()
 
 
-def bind_task(
+def connect_lab(
     task: Task,
     *,
-    environment: Callable[[TaskState], LabEnvironment],
+    lab: Callable[[TaskState], Lab],
     scorer: EvidenceJudge | None = None,
     requires: frozenset[str] | Requirements,
-    evidence_dir: Path,
+    lab_log_dir: Path,
     allow_physical: bool = False,
     observation_timeout: float = 30,
     metrics: tuple[str, ...] = DEFAULT_METRICS,
     judge: EvidenceJudge | None = None,
-    action_policy: ActionPolicy | None = None,
+    rules: ActionRules | None = None,
     approver: Approver | None = None,
     monitors: Sequence[Monitor] = (),
 ) -> Task:
-    """Attach lab tools/evidence to an existing native Task without replacing its solver.
+    """Connect a native Inspect task to a Lab, keeping its own solver.
+
+    The agent gets the Lab's tools; the evaluator records a lab log of what the Lab
+    did, and the scorer judges the agent's report against that log.
 
     Args:
         task: Native Task containing the dataset, solver, approvals and budgets.
-        environment: Trusted factory returning a Lab (scoped provider client) per sample.
+        lab: Trusted factory returning a fresh Lab for each sample.
         scorer: Pure lab scoring function of the report and the lab log, installed as
             a native Inspect scorer and reused unchanged for saved-evidence rescore.
         requires: Capabilities, or typed operation requirements, checked against the
-            environment declaration before any actor dispatch.
-        evidence_dir: Private directory retaining sample evidence even on failed runs.
+            Lab's declarations before the agent gets any tool.
+        lab_log_dir: Private directory for lab logs, kept even on failed runs.
         allow_physical: Host authorization for a physical provider; defaults to denied.
         observation_timeout: Bound for read-only provider observation, in seconds.
         metrics: Every key the scorer may return; must include known and correct.
         judge: Deprecated alias of ``scorer``.
-        action_policy: Check every Lab tool call before it runs, and record the
-            decision in the lab log. Off when None, as before.
-        approver: Called for actions the policy holds; returns True only if a person
+        rules: Check every Lab tool call before it runs, and record the decision in
+            the lab log. Off when None.
+        approver: Called for actions the rules hold; returns True only if a person
             approved. Without one, held actions are refused.
         monitors: Run after scoring each sample; flags go into the score's metadata.
 
@@ -635,14 +632,14 @@ def bind_task(
         ValueError: The task already has a scorer; outcome ownership must be explicit.
         TypeError: Neither or both of ``scorer`` and ``judge`` were passed.
 
-    Samples raise ``CompatibilityError`` before dispatch when the environment does not
+    Samples raise ``CompatibilityError`` before dispatch when the Lab does not
     satisfy ``requires`` or is physical without ``allow_physical``. A provider that sets
     ``safety_abort`` stops later samples of the same task execution with ``SafetyAbort``.
     """
     required = (
         requires if isinstance(requires, Requirements) else Requirements(capabilities=requires)
     )
-    outcome = _scorer_argument(scorer, judge, "bind_task")
+    outcome = _scorer_argument(scorer, judge, "connect_lab")
     if task.scorer:
         raise ValueError("Bind an unscored Task; the lab scorer owns the outcome")
     keys = _metric_keys(metrics)
@@ -661,7 +658,7 @@ def bind_task(
             attempt = _sample_scopes.get(state.uuid)
             if attempt is None:
                 raise ValueError("Native lab lifecycle hooks did not initialize this sample")
-            latch = _latch(evidence_dir, attempt.task_name)
+            latch = _latch(lab_log_dir, attempt.task_name)
             if str(latch) in _unpersisted_latches:
                 reason = _unpersisted_latches[str(latch)]
                 raise SafetyAbort(f"Task halted by an earlier safety abort: {reason}")
@@ -669,11 +666,11 @@ def bind_task(
                 raise SafetyAbort(
                     f"Task halted by an earlier safety abort: {latch.read_text().strip()}"
                 )
-            evidence_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+            lab_log_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
             try:
                 with os.fdopen(
                     os.open(
-                        evidence_dir / f"{attempt.scope}.attempt",
+                        lab_log_dir / f"{attempt.scope}.attempt",
                         os.O_WRONLY | os.O_CREAT | os.O_EXCL,
                         0o600,
                     ),
@@ -685,7 +682,7 @@ def bind_task(
                     "Lab sample was already attempted; reconcile its evidence before "
                     "authorizing a new execution"
                 ) from exc
-            provider = environment(state)
+            provider = lab(state)
             info = provider.info
             problems = compatibility_problems(required, info.capabilities, info.operations)
             if info.mode == "physical" and not allow_physical:
@@ -694,14 +691,12 @@ def bind_task(
                 await provider.close()
                 raise CompatibilityError("Unsupported lab requirements: " + "; ".join(problems))
             session = _Session(
-                provider, evidence_dir, observation_timeout, attempt, provider.info, keys
+                provider, lab_log_dir, observation_timeout, attempt, provider.info, keys
             )
             _sessions[state.uuid] = session
             lab_tools = provider.tools
-            if action_policy is not None:
-                gateway = Gateway(
-                    session.info.operations, action_policy, approver, records=session.actions
-                )
+            if rules is not None:
+                gateway = Gateway(session.info.operations, rules, approver, records=session.actions)
                 lab_tools = [_checked_tool(lab_tool, gateway) for lab_tool in lab_tools]
             state.tools = [*state.tools, *lab_tools]
             return state
@@ -733,9 +728,9 @@ def bind_task(
     return task
 
 
-def rescore_workflow(
-    native_log: Path,
-    evidence_file: Path,
+def rescore(
+    eval_log: Path,
+    lab_log_file: Path,
     output: Path,
     scorer: EvidenceJudge | None = None,
     metrics: tuple[str, ...] | None = None,
@@ -746,8 +741,8 @@ def rescore_workflow(
     """Rescore linked workflow evidence with no environment or robot construction.
 
     Args:
-        native_log: Original native Inspect artifact.
-        evidence_file: Its private .labs companion (JSON content, not a native log).
+        eval_log: The run's native Inspect eval log.
+        lab_log_file: The run's ``.labs`` lab log file.
         output: New native log destination; existing files are never overwritten.
         scorer: Explicit trusted lab scoring function, never imported from the artifact.
         metrics: Override the metric keys recorded in the evidence at bind time.
@@ -759,11 +754,11 @@ def rescore_workflow(
         OSError: Evidence is unavailable or the output already exists.
         TypeError: Neither or both of ``scorer`` and ``judge`` were passed.
     """
-    outcome = _scorer_argument(scorer, judge, "rescore_workflow")
-    bundle = read_lab_logs(evidence_file)
-    if artifact_digest(native_log) != bundle.native_sha256:
+    outcome = _scorer_argument(scorer, judge, "rescore")
+    bundle = read_lab_logs(lab_log_file)
+    if artifact_digest(eval_log) != bundle.native_sha256:
         raise ValueError("Native artifact hash mismatch")
-    log = read_eval_log(str(native_log))
+    log = read_eval_log(str(eval_log))
     samples = log.samples or []
     uuids = {sample.uuid for sample in samples}
     # Samples halted or rejected before dispatch have no evidence; they must have errored.
@@ -783,7 +778,7 @@ def rescore_workflow(
             linked = {
                 (score.metadata or {}).get("lab_log_sha256") for score in native_scores.values()
             } - {None}
-            if linked and linked != {run_time_digest(record)}:
+            if linked and linked != {run_time_hash(record)}:
                 raise ValueError("Lab log does not match the digest in the native log")
         for link in record.artifacts:
             if artifact_digest(Path(link.path)) != link.sha256:
@@ -816,24 +811,22 @@ def rescore_workflow(
     write_eval_log(result, str(output))
 
 
-def read_lab_logs(evidence_file: Path) -> WorkflowEvidence:
+def read_lab_logs(evidence_file: Path) -> LabLogFile:
     """Read a run's ``.labs`` file and check each sample's hash chain (schema 3).
 
     Raises:
         ValueError: A sample's records do not match its recorded hash chain.
         OSError: The file is unavailable.
     """
-    bundle = WorkflowEvidence.model_validate_json(evidence_file.read_text())
+    bundle = LabLogFile.model_validate_json(evidence_file.read_text())
     if bundle.schema_version >= 3:
         for record in bundle.samples.values():
-            if record.chain_sha256 is None or lab_log_digest(record) != record.chain_sha256:
+            if record.chain_sha256 is None or lab_log_hash(record) != record.chain_sha256:
                 raise ValueError("Lab log hash mismatch")
     return bundle
 
 
-def replay_action_policy(
-    evidence_file: Path, policy: ActionPolicy
-) -> dict[str, list[ReplayedDecision]]:
+def replay_rules(evidence_file: Path, policy: ActionRules) -> dict[str, list[ReplayedDecision]]:
     """Re-decide every saved action in a run under ``policy``, running nothing.
 
     Args:
@@ -853,14 +846,14 @@ def replay_action_policy(
     }
 
 
-def attach_late_observation(
+def attach_late_result(
     evidence_file: Path,
     sample_uuid: str,
     payload: dict[str, JsonValue],
     output: Path,
     *,
     note: str = "",
-) -> WorkflowEvidence:
+) -> LabLogFile:
     """Attach a result that arrived after the run, writing a new lab log file.
 
     The original file is not changed. The new entry is chained after the existing
@@ -887,20 +880,20 @@ def attach_late_observation(
     record = bundle.samples.get(sample_uuid)
     if record is None or record.chain_sha256 is None:
         raise ValueError(f"No sample {sample_uuid!r} in this lab log")
-    late = LateObservation(
+    late = LateResult(
         attached_at=datetime.now(UTC).isoformat(),
         payload=payload,
         note=note,
         previous_chain_sha256=record.chain_sha256,
     )
-    updated = record.model_copy(update={"late_observations": [*record.late_observations, late]})
-    updated = updated.model_copy(update={"chain_sha256": lab_log_digest(updated)})
+    updated = record.model_copy(update={"late_results": [*record.late_results, late]})
+    updated = updated.model_copy(update={"chain_sha256": lab_log_hash(updated)})
     result = bundle.model_copy(update={"samples": {**bundle.samples, sample_uuid: updated}})
     _write_private(output, result)
     return result
 
 
-def monitor_run(
+def monitor_saved_run(
     native_log: Path, evidence_file: Path, monitors: Sequence[Monitor]
 ) -> dict[str, list[Flag]]:
     """Run monitors on a saved run, offline. Nothing is dispatched.
@@ -928,3 +921,71 @@ def monitor_run(
             scores = value if isinstance(value, dict) else {}
         flags[uuid] = run_monitors(_monitor_input(uuid, record, report, scores), monitors)
     return flags
+
+
+# Earlier names, kept for one release.
+LabEnvironment = Lab
+"""Earlier name of `Lab`."""
+EnvironmentInfo = LabInfo
+"""Earlier name of `LabInfo`."""
+LabEvidence = LabLog
+"""Earlier name of `LabLog`."""
+WorkflowEvidence = LabLogFile
+"""Earlier name of `LabLogFile`."""
+
+
+def bind_task(
+    task: Task,
+    *,
+    environment: Callable[[TaskState], Lab],
+    evidence_dir: Path,
+    requires: frozenset[str] | Requirements,
+    scorer: EvidenceJudge | None = None,
+    judge: EvidenceJudge | None = None,
+    allow_physical: bool = False,
+    observation_timeout: float = 30,
+    metrics: tuple[str, ...] = DEFAULT_METRICS,
+    action_policy: ActionRules | None = None,
+    approver: Approver | None = None,
+    monitors: Sequence[Monitor] = (),
+) -> Task:
+    """Deprecated: use `connect_lab` (``environment`` is ``lab``, ``evidence_dir`` is
+    ``lab_log_dir`` and ``action_policy`` is ``rules``)."""
+    warnings.warn(
+        "bind_task is deprecated; use connect_lab(task, lab=..., lab_log_dir=..., rules=...)",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return connect_lab(
+        task,
+        lab=environment,
+        lab_log_dir=evidence_dir,
+        requires=requires,
+        scorer=scorer,
+        judge=judge,
+        allow_physical=allow_physical,
+        observation_timeout=observation_timeout,
+        metrics=metrics,
+        rules=action_policy,
+        approver=approver,
+        monitors=monitors,
+    )
+
+
+def rescore_workflow(
+    native_log: Path,
+    evidence_file: Path,
+    output: Path,
+    scorer: EvidenceJudge | None = None,
+    metrics: tuple[str, ...] | None = None,
+    *,
+    judge: EvidenceJudge | None = None,
+    monitors: Sequence[Monitor] = (),
+) -> None:
+    """Deprecated: use `rescore`."""
+    warnings.warn(
+        "rescore_workflow is deprecated; use rescore(eval_log, lab_log_file, output, scorer)",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    rescore(native_log, evidence_file, output, scorer, metrics, judge=judge, monitors=monitors)

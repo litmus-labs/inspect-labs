@@ -3,7 +3,7 @@
 import argparse
 from pathlib import Path
 
-from inspect_labs.bindings import rescore_workflow
+from inspect_labs.bindings import rescore
 from inspect_labs_plate_reader.tasks import METRICS, qc_outcome
 
 
@@ -14,7 +14,7 @@ def main() -> None:
     parser.add_argument("evidence", type=Path)
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
-    rescore_workflow(args.native_log, args.evidence, args.output, qc_outcome, metrics=METRICS)
+    rescore(args.native_log, args.evidence, args.output, qc_outcome, metrics=METRICS)
     print(f"Rescored saved evidence: {args.output}")
 
 

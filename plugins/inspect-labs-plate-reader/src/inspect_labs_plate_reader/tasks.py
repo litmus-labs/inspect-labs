@@ -13,7 +13,7 @@ from inspect_ai.model import ChatMessageAssistant, ChatMessageTool, ModelOutput,
 from inspect_ai.solver import Generate, Solver, TaskState, generate, solver
 from inspect_ai.tool import ToolCall
 
-from inspect_labs.bindings import LabEvidence, artifact_digest, bind_task
+from inspect_labs.bindings import LabLog, artifact_digest, connect_lab
 from inspect_labs.tasks import final_answer
 from inspect_labs_plate_reader.environment import WELLS, Case, PlateReaderEnvironment, Reading
 
@@ -26,7 +26,7 @@ are test inputs, not biological measurements. If the read is unavailable, do not
 infer values. Finish with exactly one line: ANSWER: pass / fail / unknown."""
 
 
-def qc_outcome(report: str, evidence: LabEvidence) -> dict[str, int | float]:
+def qc_outcome(report: str, evidence: LabLog) -> dict[str, int | float]:
     """Compare actor report with linked reader output, never with actor claims alone."""
     payload = evidence.payload or {}
     status = payload.get("status")
@@ -122,13 +122,11 @@ def absorbance_qc(
         solver=scripted_qc() if scripted else generate(),
         message_limit=10,
     )
-    return bind_task(
+    return connect_lab(
         native,
-        environment=lambda state: PlateReaderEnvironment(
-            state.uuid, directory / state.uuid, case=case
-        ),
+        lab=lambda state: PlateReaderEnvironment(state.uuid, directory / state.uuid, case=case),
         scorer=qc_outcome,
         requires=frozenset({"plate_reading", "absorbance_qc"}),
-        evidence_dir=directory,
+        lab_log_dir=directory,
         metrics=METRICS,
     )

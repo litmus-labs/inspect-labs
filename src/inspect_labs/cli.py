@@ -18,14 +18,14 @@ from inspect_ai import eval
 from inspect_ai.log import read_eval_log
 from inspect_ai.model import ModelCost, ModelInfo, get_model_info, set_model_info
 
-from inspect_labs.actions import ActionPolicy
+from inspect_labs.actions import ActionRules
 from inspect_labs.bindings import (
     EvidenceJudge,
-    WorkflowEvidence,
-    attach_late_observation,
-    monitor_run,
-    replay_action_policy,
-    rescore_workflow,
+    LabLogFile,
+    attach_late_result,
+    monitor_saved_run,
+    replay_rules,
+    rescore,
 )
 from inspect_labs.conformance import diagnose
 from inspect_labs.evidence import rescore_evidence
@@ -131,13 +131,13 @@ def main() -> None:
     )
     attach.add_argument("--output", type=Path, required=True, help="New .labs file to write")
     attach.add_argument("--note", default="", help="Where the result came from")
-    replay_policy = commands.add_parser(
-        "replay-policy",
-        help="Re-decide a run's saved actions under another action policy, running nothing",
+    replay_rules_command = commands.add_parser(
+        "replay-rules",
+        help="Re-decide a run's saved actions under other action rules, running nothing",
     )
-    replay_policy.add_argument("evidence", type=Path, help="The run's .labs file")
-    replay_policy.add_argument(
-        "--policy", type=Path, required=True, help="Action policy as a JSON file"
+    replay_rules_command.add_argument("evidence", type=Path, help="The run's .labs file")
+    replay_rules_command.add_argument(
+        "--rules", type=Path, required=True, help="Action rules as a JSON file"
     )
     listing = commands.add_parser("list", help="List installed Labs and backends")
     listing.add_argument("kind", nargs="?", choices=["lab", "backend", "environment"])
@@ -162,7 +162,7 @@ def main() -> None:
                 return
             if args.command == "monitor":
                 try:
-                    flagged = monitor_run(args.native_log, args.evidence, DEFAULT_MONITORS)
+                    flagged = monitor_saved_run(args.native_log, args.evidence, DEFAULT_MONITORS)
                 except (ValueError, OSError) as exc:
                     parser.error(f"Cannot monitor: {type(exc).__name__}: {exc}")
                 flags = [
@@ -180,7 +180,7 @@ def main() -> None:
                     payload = json.loads(args.observation.read_text())
                     if not isinstance(payload, dict):
                         raise ValueError("The observation must be a JSON object")
-                    attach_late_observation(
+                    attach_late_result(
                         args.evidence, args.sample, payload, args.output, note=args.note
                     )
                 except (ValueError, OSError) as exc:
@@ -190,12 +190,12 @@ def main() -> None:
                     file=stdout,
                 )
                 return
-            if args.command == "replay-policy":
+            if args.command == "replay-rules":
                 try:
-                    policy = ActionPolicy.model_validate_json(args.policy.read_text())
-                    replayed = replay_action_policy(args.evidence, policy)
+                    rules = ActionRules.model_validate_json(args.rules.read_text())
+                    replayed = replay_rules(args.evidence, rules)
                 except (ValueError, OSError) as exc:
-                    parser.error(f"Cannot replay policy: {type(exc).__name__}: {exc}")
+                    parser.error(f"Cannot replay rules: {type(exc).__name__}: {exc}")
                 decisions = [
                     {"sample": uuid, **decision.model_dump(mode="json")}
                     for uuid, items in replayed.items()
@@ -204,7 +204,7 @@ def main() -> None:
                 print(
                     json.dumps(
                         {
-                            "policy_version": policy.version,
+                            "rules_version": rules.version,
                             "actions": len(decisions),
                             "changed": sum(1 for d in decisions if d["changed"]),
                             "decisions": decisions,
@@ -251,7 +251,7 @@ def main() -> None:
                         raise ValueError("Evidence must be a JSON object")
                     schema = document.get("schema_version")
                     if schema in (2, 3):
-                        bundle = WorkflowEvidence.model_validate_json(args.evidence.read_text())
+                        bundle = LabLogFile.model_validate_json(args.evidence.read_text())
                         judges = {
                             "measurement": measurement_outcome,
                             "handoff": handoff_outcome,
@@ -269,7 +269,7 @@ def main() -> None:
                                 f"Task {bundle.task!r} is not built in: pass its scorer with "
                                 "--scorer FILE.py:function (for example my_task.py:my_outcome)"
                             )
-                        rescore_workflow(args.native_log, args.evidence, args.output, judge)
+                        rescore(args.native_log, args.evidence, args.output, judge)
                         log = read_eval_log(str(args.output))
                     else:
                         log = rescore_evidence(args.native_log, args.evidence, args.output)
@@ -359,7 +359,7 @@ def main() -> None:
             evidence = Path(log.location).with_suffix(".labs")
             if not evidence.exists():
                 raise SystemExit("Native run has no sealed lab evidence; inspect native errors")
-            bundle = WorkflowEvidence.model_validate_json(evidence.read_text())
+            bundle = LabLogFile.model_validate_json(evidence.read_text())
             # Provider-side count; None when any sample's provider facts are unobserved.
             submissions: int | None = 0
             for record in bundle.samples.values():

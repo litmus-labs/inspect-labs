@@ -1,7 +1,7 @@
 """Checks that run before each agent action reaches a Lab.
 
 Each operation a Lab declares can say what kind of action it is. Before a tool call
-runs, an `ActionPolicy` decides whether to allow it, refuse it, or hold it for a
+runs, an `ActionRules` decides whether to allow it, refuse it, or hold it for a
 person's approval, and the decision is recorded in the lab log with its reason.
 
 This module is pure: no Inspect, no Lab, no I/O. The same policy and records can be
@@ -66,7 +66,7 @@ class Rule(BaseModel):
     reason: str = Field(min_length=1)
 
 
-class ActionPolicy(BaseModel):
+class ActionRules(BaseModel):
     """An ordered, versioned list of rules. The first matching rule decides.
 
     Two checks always run first:
@@ -112,7 +112,7 @@ class ActionPolicy(BaseModel):
         return Decision(outcome="deny", rule="default", reason="No rule allows this type of action")
 
 
-DEFAULT_ACTION_POLICY = ActionPolicy(
+DEFAULT_RULES = ActionRules(
     version="1",
     rules=(
         Rule(
@@ -139,7 +139,7 @@ class ActionRecord(BaseModel):
     sequence: int = Field(ge=1)
     requested_at: str
     action: Action
-    policy_version: str
+    rules_version: str
     decision: Decision
     approved: bool | None = None
     """For a held action: whether a person approved it. None when not held."""
@@ -155,14 +155,14 @@ class ReplayedDecision(BaseModel):
     sequence: int
     tool: str
     recorded: Decision
-    recorded_policy_version: str
+    recorded_rules_version: str
     replayed: Decision
     changed: bool
 
 
 def replay_decisions(
     records: list[ActionRecord],
-    policy: ActionPolicy,
+    policy: ActionRules,
     operations: dict[str, OperationSpec],
 ) -> list[ReplayedDecision]:
     """Re-decide saved actions under ``policy``. Pure: nothing is dispatched.
@@ -178,7 +178,7 @@ def replay_decisions(
                 sequence=record.sequence,
                 tool=record.action.tool,
                 recorded=record.decision,
-                recorded_policy_version=record.policy_version,
+                recorded_rules_version=record.rules_version,
                 replayed=decision,
                 changed=decision.outcome != record.decision.outcome,
             )

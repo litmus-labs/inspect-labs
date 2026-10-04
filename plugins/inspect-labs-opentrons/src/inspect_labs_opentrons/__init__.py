@@ -2,7 +2,7 @@
 
 ``opentrons-ot2-simulator`` runs PyLabRobot's OT-2 simulator: the OT-2 backend's
 mount and pipette logic with no hardware and no vendor client. ``opentrons-ot2``
-drives a real robot over its HTTP API. It is physical: `bind_task` refuses it unless
+drives a real robot over its HTTP API. It is physical: `connect_lab` refuses it unless
 the host passes ``allow_physical=True``, and it claims the robot's address so two
 evaluations cannot drive it at once. Neither flag replaces facility authorization,
 interlocks or an operator.

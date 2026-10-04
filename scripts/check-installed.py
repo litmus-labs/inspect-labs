@@ -137,10 +137,10 @@ def verify_installed(work: Path, python: Path) -> None:
     assert robot_parent.status == "success", robot_parent.error
     robot_score = next(iter(robot_parent.samples[0].scores.values())).value
     assert robot_score["correct"] == robot_score["rollouts"] == 1
-    from inspect_labs.bindings import WorkflowEvidence
+    from inspect_labs.bindings import LabLogFile
 
     robot_evidence = robot_native.with_suffix(".labs")
-    bundle = WorkflowEvidence.model_validate_json(robot_evidence.read_text())
+    bundle = LabLogFile.model_validate_json(robot_evidence.read_text())
     (sample,) = bundle.samples.values()
     (rollout,) = sample.payload["rollouts"]
     child_logs = [Path(path) for path in rollout["logs"]]
