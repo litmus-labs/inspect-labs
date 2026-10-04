@@ -185,3 +185,21 @@ async def test_cli_serves_a_registered_lab_over_stdio(tmp_path):
         False,
         "refused",
     )
+
+
+@pytest.mark.anyio
+async def test_a_labs_own_checks_run_when_served(tmp_path):
+    from inspect_labs.actions import Decision
+
+    def no_b_row(action):
+        if action.arguments.get("well", "").startswith("B"):
+            return Decision(outcome="deny", rule="deck:no-row-b", reason="Row B is reserved")
+        return None
+
+    lab = LiquidHandlingEnvironment(tmp_path / "checked", LAYOUT)
+    lab.checks = [no_b_row]
+    session = LabSession(lab, DEFAULT_RULES)
+    async with Client(mcp_server(session)) as client:
+        refused = await client.call_tool("read_volume", {"labware": "plate", "well": "B1"})
+    assert refused.is_error and "deck:no-row-b" in refused.content[0].text
+    assert session.gateway.records[-1].decision.source == "check"
