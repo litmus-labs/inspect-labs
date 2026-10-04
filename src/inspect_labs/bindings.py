@@ -98,6 +98,17 @@ class ArtifactLink(BaseModel):
     sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
+class LateObservation(BaseModel):
+    """A result that arrived after the run, attached to a sample's lab log."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    attached_at: str
+    payload: dict[str, JsonValue]
+    note: str = ""
+    previous_chain_sha256: str
+    """The sample's chain digest just before this entry was attached."""
+
+
 class LabEvidence(BaseModel):
     """Task-owned payload collected independently of the actor and native transcript."""
 
@@ -111,27 +122,44 @@ class LabEvidence(BaseModel):
     artifacts: list[ArtifactLink] = Field(default_factory=list)
     actions: list[ActionRecord] = Field(default_factory=list)
     """Checked agent actions, in order, when the task was bound with an action policy."""
+    late_observations: list[LateObservation] = Field(default_factory=list)
+    """Results attached after the run, oldest first. Scoring uses the latest."""
     chain_sha256: str | None = None
-    """Hash chain over this sample's action records and then its observation (schema 3).
-    It detects changed records; it does not prevent tampering by a trusted writer."""
+    """Hash chain over this sample's action records, its observation, then any late
+    observations (schema 3). It detects changed records; it does not prevent
+    tampering by a trusted writer."""
 
 
 _CHAIN_START = hashlib.sha256(b"inspect-labs/lab-log/v3").hexdigest()
 
 
-def lab_log_digest(record: LabEvidence) -> str:
-    """Chain one sample's action records, in order, then its observation.
-
-    Each step hashes the previous digest with the next entry's canonical JSON, so
-    changing, removing or reordering any entry changes the result.
-    """
-    entries: list[dict[str, Any]] = [action.model_dump(mode="json") for action in record.actions]
-    entries.append(record.model_dump(mode="json", exclude={"actions", "chain_sha256"}))
-    digest = _CHAIN_START
+def _chain(digest: str, entries: list[dict[str, Any]]) -> str:
     for entry in entries:
         canonical = json.dumps(entry, sort_keys=True, separators=(",", ":"))
         digest = hashlib.sha256((digest + canonical).encode()).hexdigest()
     return digest
+
+
+def run_time_digest(record: LabEvidence) -> str:
+    """Chain one sample's action records, in order, then its observation.
+
+    This is the digest at the end of the run, also stored in the native log.
+    """
+    entries: list[dict[str, Any]] = [action.model_dump(mode="json") for action in record.actions]
+    entries.append(
+        record.model_dump(mode="json", exclude={"actions", "late_observations", "chain_sha256"})
+    )
+    return _chain(_CHAIN_START, entries)
+
+
+def lab_log_digest(record: LabEvidence) -> str:
+    """The sample's full chain: the run-time digest, then each late observation.
+
+    Each step hashes the previous digest with the next entry's canonical JSON, so
+    changing, removing or reordering any entry changes the result.
+    """
+    late = [entry.model_dump(mode="json") for entry in record.late_observations]
+    return _chain(run_time_digest(record), late)
 
 
 class WorkflowEvidence(BaseModel):
@@ -460,6 +488,15 @@ def lab_scorer(
                 )
             # Native metrics and epoch reduction need identical keys on every sample.
             # NaN marks a value as unscored; a missing key breaks or drops the metric.
+            if record.late_observations:
+                # A result that arrived after the run replaces the run-time observation
+                # for scoring; the saved entries themselves are never changed.
+                record = record.model_copy(
+                    update={
+                        "payload": record.late_observations[-1].payload,
+                        "observation_error": None,
+                    }
+                )
             unscored: dict[str, float] = {key: math.nan for key in keys}
             # Cross-link: the native log keeps this sample's lab log digest, so a
             # changed .labs file also disagrees with the hash-linked native log.
@@ -727,7 +764,7 @@ def rescore_workflow(
             linked = {
                 (score.metadata or {}).get("lab_log_sha256") for score in native_scores.values()
             } - {None}
-            if linked and linked != {record.chain_sha256}:
+            if linked and linked != {run_time_digest(record)}:
                 raise ValueError("Lab log does not match the digest in the native log")
         for link in record.artifacts:
             if artifact_digest(Path(link.path)) != link.sha256:
@@ -795,3 +832,50 @@ def replay_action_policy(
         uuid: replay_decisions(record.actions, policy, record.environment.operations)
         for uuid, record in bundle.samples.items()
     }
+
+
+def attach_late_observation(
+    evidence_file: Path,
+    sample_uuid: str,
+    payload: dict[str, JsonValue],
+    output: Path,
+    *,
+    note: str = "",
+) -> WorkflowEvidence:
+    """Attach a result that arrived after the run, writing a new lab log file.
+
+    The original file is not changed. The new entry is chained after the existing
+    ones, and rescoring the new file uses it in place of the run-time observation.
+
+    Args:
+        evidence_file: The run's ``.labs`` file (schema 3).
+        sample_uuid: The sample the result belongs to.
+        payload: The late observation, in the same shape the Lab's ``observe()`` returns.
+        output: New lab log path; an existing file is never overwritten.
+        note: Where the result came from, for reviewers.
+
+    Returns:
+        The new lab logs.
+
+    Raises:
+        ValueError: The lab log fails its hash check, predates schema 3, or has no
+            such sample.
+        OSError: The output already exists or cannot be written.
+    """
+    bundle = read_lab_logs(evidence_file)
+    if bundle.schema_version < 3:
+        raise ValueError("Late results need a schema 3 lab log")
+    record = bundle.samples.get(sample_uuid)
+    if record is None or record.chain_sha256 is None:
+        raise ValueError(f"No sample {sample_uuid!r} in this lab log")
+    late = LateObservation(
+        attached_at=datetime.now(UTC).isoformat(),
+        payload=payload,
+        note=note,
+        previous_chain_sha256=record.chain_sha256,
+    )
+    updated = record.model_copy(update={"late_observations": [*record.late_observations, late]})
+    updated = updated.model_copy(update={"chain_sha256": lab_log_digest(updated)})
+    result = bundle.model_copy(update={"samples": {**bundle.samples, sample_uuid: updated}})
+    _write_private(output, result)
+    return result

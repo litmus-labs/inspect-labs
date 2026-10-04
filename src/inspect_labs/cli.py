@@ -22,6 +22,7 @@ from inspect_labs.actions import ActionPolicy
 from inspect_labs.bindings import (
     EvidenceJudge,
     WorkflowEvidence,
+    attach_late_observation,
     replay_action_policy,
     rescore_workflow,
 )
@@ -113,6 +114,16 @@ def main() -> None:
         "runs the named code; it is chosen by you, never read from the evidence file. "
         "--judge is an earlier spelling.",
     )
+    attach = commands.add_parser(
+        "attach", help="Attach a result that arrived after the run, as a new lab log file"
+    )
+    attach.add_argument("evidence", type=Path, help="The run's .labs file")
+    attach.add_argument("--sample", required=True, help="Sample UUID the result belongs to")
+    attach.add_argument(
+        "--observation", type=Path, required=True, help="The late observation as JSON"
+    )
+    attach.add_argument("--output", type=Path, required=True, help="New .labs file to write")
+    attach.add_argument("--note", default="", help="Where the result came from")
     replay_policy = commands.add_parser(
         "replay-policy",
         help="Re-decide a run's saved actions under another action policy, running nothing",
@@ -141,6 +152,21 @@ def main() -> None:
             if args.command == "list":
                 kinds: list[Kind] = [canonical(args.kind)] if args.kind else ["lab", "backend"]
                 print(json.dumps({kind: available(kind) for kind in kinds}), file=stdout)
+                return
+            if args.command == "attach":
+                try:
+                    payload = json.loads(args.observation.read_text())
+                    if not isinstance(payload, dict):
+                        raise ValueError("The observation must be a JSON object")
+                    attach_late_observation(
+                        args.evidence, args.sample, payload, args.output, note=args.note
+                    )
+                except (ValueError, OSError) as exc:
+                    parser.error(f"Cannot attach: {type(exc).__name__}: {exc}")
+                print(
+                    json.dumps({"lab_log": str(args.output), "sample": args.sample}),
+                    file=stdout,
+                )
                 return
             if args.command == "replay-policy":
                 try:
