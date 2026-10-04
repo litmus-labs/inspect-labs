@@ -46,6 +46,13 @@ def test_declared_module_inventory_and_dependencies() -> None:
             "inspect_labs.plugins",
         },
         "registry": {"inspect_labs"},
+        "secure_lab": {
+            "inspect_ai",
+            "inspect_labs.actions",
+            "inspect_labs.bindings",
+            "inspect_labs.liquid_tasks",
+            "inspect_labs.monitors",
+        },
         "robot_bridge": {
             "inspect_ai",
             "inspect_robots",
