@@ -115,6 +115,23 @@ zero-dispatch replay.
 | [Replay command](../plugins/inspect-labs-plate-reader/src/inspect_labs_plate_reader/rescore.py) | Installed non-dispatching rescore | main | Labs rescore, task judge | Installed CLI smoke and zero-dispatch test |
 
 The plugin's architecture test enforces its inventory and dependency direction.
+
+## OT water plant plugin
+
+The separately installed `inspect-labs-ot` package connects the
+[OT AI Assurance Lab](https://github.com/xienanzheng/ot-ai-assurance-lab)'s simulated
+water plant, imported from a local checkout. The agent proposes setpoints; the plant's
+PLC is the only writer of actuators. Proposals pass the gateway's rules and then the
+plant's own safety gate, run as a domain check. The lab log holds the simulator's
+ground truth. This shows the integration and evidence mechanics on a simulated plant,
+not physical plant behavior or validated limits.
+
+| File | Responsibility | Public surface | Dependencies | Verification |
+|---|---|---|---|---|
+| [Exports](../plugins/inspect-labs-ot/src/inspect_labs_ot/__init__.py) | Plugin exports | WaterPlantLab, ot_water_plant, plant_outcome, water_plant_supervision | lab, tasks | OT architecture test |
+| [Plant](../plugins/inspect-labs-ot/src/inspect_labs_ot/plant.py) | Loads the upstream simulator, PLC and gate; closes the control loop; applies leases; separates agent view from ground truth | Partner, WaterPlant, find_repository, REPOSITORY_ENV, TESTED_COMMIT, HIDDEN_SENSORS | Pydantic, upstream checkout | Hidden-sensor and determinism tests |
+| [Lab](../plugins/inspect-labs-ot/src/inspect_labs_ot/lab.py) | Agent tools, declared ranges, the plant's gate as a domain check, ground-truth observation | WaterPlantLab, ot_water_plant | Inspect AI, Labs actions/bindings/spec, Pydantic, anyio, plant | Conformance, gate-refusal and range-refusal tests |
+| [Task](../plugins/inspect-labs-ot/src/inspect_labs_ot/tasks.py) | Native task, lab scorer and scripted controls | water_plant_supervision, plant_outcome, scripted_supervision | Inspect AI, Pydantic, Labs actions/bindings/monitors/tasks, lab | Scripted accepted, gate-refused and out-of-range runs |
 Only the 600 nm, three-well control is admitted. A failed read attempt leaves
 completion unknown; an actor's final answer alone cannot become a measurement. The device-free
 backend can neither validate a plate-reader driver on hardware nor establish that
