@@ -62,6 +62,7 @@ inspect-labs list
 inspect-labs doctor --lab litmus-measurement
 inspect-labs run --task measurement --scripted
 inspect-labs rescore run.eval --evidence run.labs --output replay.eval
+inspect-labs replay-policy run.labs --policy new-policy.json
 ```
 
 `run` supports measurement and handoff reference tasks. Other tasks use native

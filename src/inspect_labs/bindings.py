@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import inspect
+import json
 import logging
 import math
 import os
@@ -24,9 +25,15 @@ from inspect_ai.log import list_eval_logs, read_eval_log, read_eval_log_async, w
 from inspect_ai.scorer import Score, Scorer, Target, mean, scorer
 from inspect_ai.solver import Generate, Solver, TaskState, chain, solver
 from inspect_ai.tool import Tool, ToolDef, ToolError
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_serializer
 
-from inspect_labs.actions import Action, ActionPolicy, ActionRecord
+from inspect_labs.actions import (
+    Action,
+    ActionPolicy,
+    ActionRecord,
+    ReplayedDecision,
+    replay_decisions,
+)
 from inspect_labs.errors import CompatibilityError, SafetyAbort
 from inspect_labs.spec import OperationSpec, Requirements, compatibility_problems
 
@@ -44,6 +51,11 @@ class EnvironmentInfo(BaseModel):
     operations: dict[str, OperationSpec] = Field(default_factory=dict)
     notes: str = ""
     """Honest operating notes for agents and operators (hardware, units, limits)."""
+
+    @field_serializer("capabilities")
+    def _sorted_capabilities(self, capabilities: frozenset[str]) -> list[str]:
+        # Stable order so saved lab logs hash the same after reloading.
+        return sorted(capabilities)
 
 
 class LabEnvironment(Protocol):
@@ -99,13 +111,35 @@ class LabEvidence(BaseModel):
     artifacts: list[ArtifactLink] = Field(default_factory=list)
     actions: list[ActionRecord] = Field(default_factory=list)
     """Checked agent actions, in order, when the task was bound with an action policy."""
+    chain_sha256: str | None = None
+    """Hash chain over this sample's action records and then its observation (schema 3).
+    It detects changed records; it does not prevent tampering by a trusted writer."""
+
+
+_CHAIN_START = hashlib.sha256(b"inspect-labs/lab-log/v3").hexdigest()
+
+
+def lab_log_digest(record: LabEvidence) -> str:
+    """Chain one sample's action records, in order, then its observation.
+
+    Each step hashes the previous digest with the next entry's canonical JSON, so
+    changing, removing or reordering any entry changes the result.
+    """
+    entries: list[dict[str, Any]] = [action.model_dump(mode="json") for action in record.actions]
+    entries.append(record.model_dump(mode="json", exclude={"actions", "chain_sha256"}))
+    digest = _CHAIN_START
+    for entry in entries:
+        canonical = json.dumps(entry, sort_keys=True, separators=(",", ":"))
+        digest = hashlib.sha256((digest + canonical).encode()).hexdigest()
+    return digest
 
 
 class WorkflowEvidence(BaseModel):
     """One native run's private references and observed facts for deterministic rescore."""
 
     model_config = ConfigDict(extra="forbid")
-    schema_version: Literal[2] = 2
+    schema_version: Literal[2, 3] = 3
+    """3 adds per-sample hash chains (`LabEvidence.chain_sha256`); 2 is still read."""
     task: str
     native_sha256: str
     framework_version: str
@@ -257,6 +291,7 @@ async def _observe(sample_uuid: str) -> None:
             safety_abort=_safety_abort(session.environment),
             actions=list(session.actions),
         )
+    evidence = evidence.model_copy(update={"chain_sha256": lab_log_digest(evidence)})
     _write_private(session.directory / f"{sample_uuid}.lab-sample", evidence)
     session.evidence = evidence
 
@@ -426,13 +461,16 @@ def lab_scorer(
             # Native metrics and epoch reduction need identical keys on every sample.
             # NaN marks a value as unscored; a missing key breaks or drops the metric.
             unscored: dict[str, float] = {key: math.nan for key in keys}
+            # Cross-link: the native log keeps this sample's lab log digest, so a
+            # changed .labs file also disagrees with the hash-linked native log.
+            link = {"lab_log_sha256": record.chain_sha256} if record.chain_sha256 else None
             if record.observation_error is not None or record.payload is None:
-                return Score(value={**unscored, "known": 0})
+                return Score(value={**unscored, "known": 0}, metadata=link)
             outcome = judge(state.output.completion, record)
             undeclared = set(outcome) - set(keys)
             if undeclared:
                 raise ValueError(f"Scorer returned undeclared metrics: {sorted(undeclared)}")
-            return Score(value={**unscored, **outcome})
+            return Score(value={**unscored, **outcome}, metadata=link)
 
         return assess
 
@@ -666,7 +704,7 @@ def rescore_workflow(
         TypeError: Neither or both of ``scorer`` and ``judge`` were passed.
     """
     outcome = _scorer_argument(scorer, judge, "rescore_workflow")
-    bundle = WorkflowEvidence.model_validate_json(evidence_file.read_text())
+    bundle = read_lab_logs(evidence_file)
     if artifact_digest(native_log) != bundle.native_sha256:
         raise ValueError("Native artifact hash mismatch")
     log = read_eval_log(str(native_log))
@@ -680,9 +718,17 @@ def rescore_workflow(
         or any(sample.error is None for sample in unevidenced)
     ):
         raise ValueError("Task/sample evidence binding mismatch")
+    native_by_uuid = {sample.uuid: sample for sample in samples}
     for sample_uuid, record in bundle.samples.items():
         if record.sample_uuid != sample_uuid:
             raise ValueError("Observation identity mismatch")
+        if bundle.schema_version >= 3:
+            native_scores = native_by_uuid[sample_uuid].scores or {}
+            linked = {
+                (score.metadata or {}).get("lab_log_sha256") for score in native_scores.values()
+            } - {None}
+            if linked and linked != {record.chain_sha256}:
+                raise ValueError("Lab log does not match the digest in the native log")
         for link in record.artifacts:
             if artifact_digest(Path(link.path)) != link.sha256:
                 raise ValueError("Child artifact hash mismatch")
@@ -712,3 +758,40 @@ def rescore_workflow(
     with os.fdopen(os.open(output, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w"):
         pass
     write_eval_log(result, str(output))
+
+
+def read_lab_logs(evidence_file: Path) -> WorkflowEvidence:
+    """Read a run's ``.labs`` file and check each sample's hash chain (schema 3).
+
+    Raises:
+        ValueError: A sample's records do not match its recorded hash chain.
+        OSError: The file is unavailable.
+    """
+    bundle = WorkflowEvidence.model_validate_json(evidence_file.read_text())
+    if bundle.schema_version >= 3:
+        for record in bundle.samples.values():
+            if record.chain_sha256 is None or lab_log_digest(record) != record.chain_sha256:
+                raise ValueError("Lab log hash mismatch")
+    return bundle
+
+
+def replay_action_policy(
+    evidence_file: Path, policy: ActionPolicy
+) -> dict[str, list[ReplayedDecision]]:
+    """Re-decide every saved action in a run under ``policy``, running nothing.
+
+    Args:
+        evidence_file: The run's ``.labs`` file.
+        policy: The changed policy to test against past actions.
+
+    Returns:
+        Replayed decisions per sample, in action order.
+
+    Raises:
+        ValueError: The lab log fails its hash check.
+    """
+    bundle = read_lab_logs(evidence_file)
+    return {
+        uuid: replay_decisions(record.actions, policy, record.environment.operations)
+        for uuid, record in bundle.samples.items()
+    }

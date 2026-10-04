@@ -18,7 +18,13 @@ from inspect_ai import eval
 from inspect_ai.log import read_eval_log
 from inspect_ai.model import ModelCost, ModelInfo, get_model_info, set_model_info
 
-from inspect_labs.bindings import EvidenceJudge, WorkflowEvidence, rescore_workflow
+from inspect_labs.actions import ActionPolicy
+from inspect_labs.bindings import (
+    EvidenceJudge,
+    WorkflowEvidence,
+    replay_action_policy,
+    rescore_workflow,
+)
 from inspect_labs.conformance import diagnose
 from inspect_labs.evidence import rescore_evidence
 from inspect_labs.liquid_tasks import serial_dilution_outcome, worklist_outcome
@@ -107,6 +113,14 @@ def main() -> None:
         "runs the named code; it is chosen by you, never read from the evidence file. "
         "--judge is an earlier spelling.",
     )
+    replay_policy = commands.add_parser(
+        "replay-policy",
+        help="Re-decide a run's saved actions under another action policy, running nothing",
+    )
+    replay_policy.add_argument("evidence", type=Path, help="The run's .labs file")
+    replay_policy.add_argument(
+        "--policy", type=Path, required=True, help="Action policy as a JSON file"
+    )
     listing = commands.add_parser("list", help="List installed Labs and backends")
     listing.add_argument("kind", nargs="?", choices=["lab", "backend", "environment"])
     doctor = commands.add_parser(
@@ -127,6 +141,31 @@ def main() -> None:
             if args.command == "list":
                 kinds: list[Kind] = [canonical(args.kind)] if args.kind else ["lab", "backend"]
                 print(json.dumps({kind: available(kind) for kind in kinds}), file=stdout)
+                return
+            if args.command == "replay-policy":
+                try:
+                    policy = ActionPolicy.model_validate_json(args.policy.read_text())
+                    replayed = replay_action_policy(args.evidence, policy)
+                except (ValueError, OSError) as exc:
+                    parser.error(f"Cannot replay policy: {type(exc).__name__}: {exc}")
+                decisions = [
+                    {"sample": uuid, **decision.model_dump(mode="json")}
+                    for uuid, items in replayed.items()
+                    for decision in items
+                ]
+                print(
+                    json.dumps(
+                        {
+                            "policy_version": policy.version,
+                            "actions": len(decisions),
+                            "changed": sum(1 for d in decisions if d["changed"]),
+                            "decisions": decisions,
+                            "replay_only": True,
+                        },
+                        indent=2,
+                    ),
+                    file=stdout,
+                )
                 return
             if args.command == "doctor":
                 kind = "lab" if args.lab else "backend"
@@ -163,7 +202,7 @@ def main() -> None:
                     if not isinstance(document, dict):
                         raise ValueError("Evidence must be a JSON object")
                     schema = document.get("schema_version")
-                    if schema == 2:
+                    if schema in (2, 3):
                         bundle = WorkflowEvidence.model_validate_json(args.evidence.read_text())
                         judges = {
                             "measurement": measurement_outcome,

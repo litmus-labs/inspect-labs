@@ -63,6 +63,7 @@ def test_declared_module_inventory_and_dependencies() -> None:
             "inspect_labs.liquid_tasks",
             "inspect_labs.conformance",
             "inspect_labs.plugins",
+            "inspect_labs.actions",
             "anyio",
         },
         "robot_mock": {"inspect_robots"},

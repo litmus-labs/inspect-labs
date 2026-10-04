@@ -4,7 +4,7 @@ description: "Keep observed outcomes distinct from actor reports and rescore wit
 ---
 
 Native `.eval` logs are the primary records of an Inspect evaluation. Inspect Labs
-adds a private `.labs` companion when a completed run reaches an environment and
+adds a private `.labs` file, the **lab log**, when a completed run reaches a Lab and
 finishes evidence collection.
 
 ## Records
@@ -12,13 +12,19 @@ finishes evidence collection.
 | Record | Contains |
 | --- | --- |
 | `.eval` | Native agent trajectory, tool activity, scores and error status |
-| `.labs` | Observations, environment versions, declared metrics and links to supporting artifacts |
+| `.labs` (lab log) | Observations, checked agent actions and their decisions, Lab versions, declared metrics and links to supporting artifacts |
 | `.lab-sample` | Per-sample observations retained before sealing a completed run |
 | Supporting artifacts | Provider ledgers, instrument command records or native robot logs |
 
-Hashes bind the companion to the native log and supporting files. They detect
-changed bytes. They do not authenticate a compromised evaluator or prove that a
-source record is truthful.
+Hashes bind the lab log to the native log and supporting files. Since lab log
+schema 3, each sample's action records and observation are also chained: every
+entry is hashed together with the one before it. The chain's final digest is
+stored both in the lab log and in that sample's score in the native `.eval` log.
+Editing, removing or reordering any entry makes rescoring refuse the file.
+
+Hashes detect changed bytes. They do not authenticate a compromised evaluator or
+prove that a source record is truthful. Lab logs written before schema 3 still
+rescore, without the chain check.
 
 An interrupted run may lack a sealed companion. A run refused entirely before
 laboratory dispatch has none. Missing evidence must not be reconstructed by secretly
@@ -73,6 +79,20 @@ rescore_workflow(
 Replace `measurement_outcome` with your task's lab scorer. The caller selects it; evidence
 does not name arbitrary Python modules to import. Samples that errored in the native
 run remain unscored in replay.
+
+## Test a policy change on past runs
+
+To see what a changed action policy would have decided for actions already taken,
+replay it against a saved lab log. Nothing is run:
+
+```bash
+inspect-labs replay-policy path/to/run.labs --policy new-policy.json
+```
+
+The policy file is an `ActionPolicy` as JSON. The output lists each action's
+recorded and replayed decision and counts the changes. A lab log that fails its
+hash check is refused. Replay shows what the new rules would have decided, not what
+the agent would have done next, since the agent saw the original decisions.
 
 ## Keep records private
 

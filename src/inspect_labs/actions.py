@@ -146,3 +146,41 @@ class ActionRecord(BaseModel):
     status: Literal["ran", "refused", "error"]
     """``ran``: the tool returned. ``refused``: blocked before reaching the Lab.
     ``error``: allowed, but the tool raised; the Lab may or may not have acted."""
+
+
+class ReplayedDecision(BaseModel):
+    """A saved action re-decided under another policy, without running anything."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    sequence: int
+    tool: str
+    recorded: Decision
+    recorded_policy_version: str
+    replayed: Decision
+    changed: bool
+
+
+def replay_decisions(
+    records: list[ActionRecord],
+    policy: ActionPolicy,
+    operations: dict[str, OperationSpec],
+) -> list[ReplayedDecision]:
+    """Re-decide saved actions under ``policy``. Pure: nothing is dispatched.
+
+    Shows what a rule change would have done to a past run. It does not show what
+    the agent would have done next, since the agent saw the original decisions.
+    """
+    replayed = []
+    for record in records:
+        decision = policy.decide(record.action, operations)
+        replayed.append(
+            ReplayedDecision(
+                sequence=record.sequence,
+                tool=record.action.tool,
+                recorded=record.decision,
+                recorded_policy_version=record.policy_version,
+                replayed=decision,
+                changed=decision.outcome != record.decision.outcome,
+            )
+        )
+    return replayed
