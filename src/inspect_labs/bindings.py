@@ -11,7 +11,7 @@ import os
 import re
 import typing
 import warnings
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from importlib.metadata import version
@@ -35,6 +35,7 @@ from inspect_labs.actions import (
     replay_decisions,
 )
 from inspect_labs.errors import CompatibilityError, SafetyAbort
+from inspect_labs.monitors import Flag, Monitor, MonitorInput, run_monitors
 from inspect_labs.spec import OperationSpec, Requirements, compatibility_problems
 
 logger = logging.getLogger(__name__)
@@ -449,10 +450,26 @@ def _metric_keys(metrics: tuple[str, ...]) -> tuple[str, ...]:
     return metrics
 
 
+def _monitor_input(
+    sample_uuid: str, record: LabEvidence, report: str | None, scores: dict[str, Any]
+) -> MonitorInput:
+    observed = bool(record.late_observations) or (
+        record.observation_error is None and record.payload is not None
+    )
+    return MonitorInput(
+        sample=sample_uuid,
+        actions=record.actions,
+        observed=observed,
+        report=report,
+        scores=scores,
+    )
+
+
 def lab_scorer(
     judge: EvidenceJudge,
     evidence: dict[str, LabEvidence] | None = None,
     metrics: tuple[str, ...] = DEFAULT_METRICS,
+    monitors: Sequence[Monitor] = (),
 ) -> Scorer:
     """Build a native Inspect scorer from a pure lab scoring function.
 
@@ -465,6 +482,8 @@ def lab_scorer(
         evidence: Saved lab logs for replay; omitted during native execution.
         metrics: Every key the function may return. Unknown outcomes and omitted keys
             are NaN (unscored), so every sample and epoch has the same keys.
+        monitors: Run on each sample after scoring; their flags go into the score's
+            metadata as ``lab_flags``, so they appear in Inspect's log viewer.
 
     Returns:
         Native scorer. Private payloads are never registered scorer arguments.
@@ -500,14 +519,23 @@ def lab_scorer(
             unscored: dict[str, float] = {key: math.nan for key in keys}
             # Cross-link: the native log keeps this sample's lab log digest, so a
             # changed .labs file also disagrees with the hash-linked native log.
-            link = {"lab_log_sha256": record.chain_sha256} if record.chain_sha256 else None
+            metadata: dict[str, Any] = {}
+            if record.chain_sha256:
+                metadata["lab_log_sha256"] = record.chain_sha256
             if record.observation_error is not None or record.payload is None:
-                return Score(value={**unscored, "known": 0}, metadata=link)
-            outcome = judge(state.output.completion, record)
-            undeclared = set(outcome) - set(keys)
-            if undeclared:
-                raise ValueError(f"Scorer returned undeclared metrics: {sorted(undeclared)}")
-            return Score(value={**unscored, **outcome}, metadata=link)
+                value: dict[str, float | int] = {**unscored, "known": 0}
+            else:
+                outcome = judge(state.output.completion, record)
+                undeclared = set(outcome) - set(keys)
+                if undeclared:
+                    raise ValueError(f"Scorer returned undeclared metrics: {sorted(undeclared)}")
+                value = {**unscored, **outcome}
+            if monitors:
+                entry = _monitor_input(state.uuid, record, state.output.completion, value)
+                metadata["lab_flags"] = [
+                    flag.model_dump(mode="json") for flag in run_monitors(entry, monitors)
+                ]
+            return Score(value=value, metadata=metadata or None)
 
         return assess
 
@@ -591,6 +619,7 @@ def bind_task(
     judge: EvidenceJudge | None = None,
     action_policy: ActionPolicy | None = None,
     approver: Approver | None = None,
+    monitors: Sequence[Monitor] = (),
 ) -> Task:
     """Attach lab tools/evidence to an existing native Task without replacing its solver.
 
@@ -610,6 +639,7 @@ def bind_task(
             decision in the lab log. Off when None, as before.
         approver: Called for actions the policy holds; returns True only if a person
             approved. Without one, held actions are refused.
+        monitors: Run after scoring each sample; flags go into the score's metadata.
 
     Returns:
         The native Task, with setup, scorer and cleanup bindings installed.
@@ -711,7 +741,7 @@ def bind_task(
                     await previous_cleanup(state)
 
     task.setup = setup_lab()
-    task.scorer = [lab_scorer(outcome, metrics=keys)]
+    task.scorer = [lab_scorer(outcome, metrics=keys, monitors=monitors)]
     task.cleanup = cleanup
     return task
 
@@ -724,6 +754,7 @@ def rescore_workflow(
     metrics: tuple[str, ...] | None = None,
     *,
     judge: EvidenceJudge | None = None,
+    monitors: Sequence[Monitor] = (),
 ) -> None:
     """Rescore linked workflow evidence with no environment or robot construction.
 
@@ -734,6 +765,7 @@ def rescore_workflow(
         scorer: Explicit trusted lab scoring function, never imported from the artifact.
         metrics: Override the metric keys recorded in the evidence at bind time.
         judge: Deprecated alias of ``scorer``.
+        monitors: Run on each rescored sample; flags go into the score's metadata.
 
     Raises:
         ValueError: The native or child artifacts do not match recorded provenance.
@@ -777,7 +809,7 @@ def rescore_workflow(
         subset.eval.model_roles = None
         scored = score(
             subset,
-            lab_scorer(outcome, bundle.samples, metrics or bundle.metrics),
+            lab_scorer(outcome, bundle.samples, metrics or bundle.metrics, monitors),
             model="mockllm/model",
             action="overwrite",
             display="none",
@@ -879,3 +911,33 @@ def attach_late_observation(
     result = bundle.model_copy(update={"samples": {**bundle.samples, sample_uuid: updated}})
     _write_private(output, result)
     return result
+
+
+def monitor_run(
+    native_log: Path, evidence_file: Path, monitors: Sequence[Monitor]
+) -> dict[str, list[Flag]]:
+    """Run monitors on a saved run, offline. Nothing is dispatched.
+
+    Args:
+        native_log: The run's native ``.eval`` log (for each sample's report and scores).
+        evidence_file: The run's ``.labs`` file; its hash chain is checked first.
+        monitors: Monitors to run on every sample in the lab log.
+
+    Returns:
+        Flags per sample, in sample order.
+
+    Raises:
+        ValueError: The lab log fails its hash check.
+    """
+    bundle = read_lab_logs(evidence_file)
+    native = {sample.uuid: sample for sample in read_eval_log(str(native_log)).samples or []}
+    flags: dict[str, list[Flag]] = {}
+    for uuid, record in bundle.samples.items():
+        sample = native.get(uuid)
+        report = sample.output.completion if sample is not None else None
+        scores: dict[str, Any] = {}
+        if sample is not None and sample.scores:
+            value = next(iter(sample.scores.values())).value
+            scores = value if isinstance(value, dict) else {}
+        flags[uuid] = run_monitors(_monitor_input(uuid, record, report, scores), monitors)
+    return flags

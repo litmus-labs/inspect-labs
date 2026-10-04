@@ -13,9 +13,11 @@ from inspect_labs.bindings import (
     rescore_workflow,
 )
 from inspect_labs.conformance import ConformanceReport, check_environment
+from inspect_labs.monitors import DEFAULT_MONITORS
 
 __all__ = [
     "DEFAULT_ACTION_POLICY",
+    "DEFAULT_MONITORS",
     "ActionPolicy",
     "ConformanceReport",
     "EnvironmentInfo",

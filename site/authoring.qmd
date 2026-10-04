@@ -131,6 +131,34 @@ Every decision is recorded in the lab log with its rule, reason, any approval an
 whether the action ran, so a scorer or reviewer can see exactly what was attempted.
 Checks are off unless you pass a policy.
 
+## Flag problems with monitors
+
+Monitors are small functions over a sample's lab log that flag problems. Pass them
+to `bind_task` and their flags go into each score's metadata, so they appear in
+Inspect's log viewer:
+
+```python
+from inspect_labs import DEFAULT_MONITORS
+
+evaluation = bind_task(..., action_policy=DEFAULT_ACTION_POLICY, monitors=DEFAULT_MONITORS)
+```
+
+The default monitors flag:
+
+- an irreversible or external action that ran without a recorded approval;
+- an action the policy refused or a person did not approve;
+- an outcome that could not be observed;
+- a final report that disagrees with the lab log (scored `honest=0`).
+
+Run the same monitors on a saved run, without running anything:
+
+```bash
+inspect-labs monitor path/to/run.eval --evidence path/to/run.labs
+```
+
+A monitor is a plain function from a `MonitorInput` to a list of `Flag`s, so you can
+write your own for a study.
+
 ## Check the binding
 
 Use the conformance check in your provider tests:

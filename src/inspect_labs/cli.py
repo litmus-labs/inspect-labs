@@ -23,12 +23,14 @@ from inspect_labs.bindings import (
     EvidenceJudge,
     WorkflowEvidence,
     attach_late_observation,
+    monitor_run,
     replay_action_policy,
     rescore_workflow,
 )
 from inspect_labs.conformance import diagnose
 from inspect_labs.evidence import rescore_evidence
 from inspect_labs.liquid_tasks import serial_dilution_outcome, worklist_outcome
+from inspect_labs.monitors import DEFAULT_MONITORS
 from inspect_labs.plugins import Kind, available, canonical
 from inspect_labs.tasks import (
     handoff,
@@ -114,6 +116,11 @@ def main() -> None:
         "runs the named code; it is chosen by you, never read from the evidence file. "
         "--judge is an earlier spelling.",
     )
+    monitor = commands.add_parser(
+        "monitor", help="Run the default monitors on a saved run and list their flags"
+    )
+    monitor.add_argument("native_log", type=Path, help="The run's .eval log")
+    monitor.add_argument("--evidence", type=Path, required=True, help="The run's .labs file")
     attach = commands.add_parser(
         "attach", help="Attach a result that arrived after the run, as a new lab log file"
     )
@@ -152,6 +159,21 @@ def main() -> None:
             if args.command == "list":
                 kinds: list[Kind] = [canonical(args.kind)] if args.kind else ["lab", "backend"]
                 print(json.dumps({kind: available(kind) for kind in kinds}), file=stdout)
+                return
+            if args.command == "monitor":
+                try:
+                    flagged = monitor_run(args.native_log, args.evidence, DEFAULT_MONITORS)
+                except (ValueError, OSError) as exc:
+                    parser.error(f"Cannot monitor: {type(exc).__name__}: {exc}")
+                flags = [
+                    flag.model_dump(mode="json") for items in flagged.values() for flag in items
+                ]
+                print(
+                    json.dumps(
+                        {"samples": len(flagged), "flags": flags, "replay_only": True}, indent=2
+                    ),
+                    file=stdout,
+                )
                 return
             if args.command == "attach":
                 try:

@@ -64,6 +64,7 @@ inspect-labs run --task measurement --scripted
 inspect-labs rescore run.eval --evidence run.labs --output replay.eval
 inspect-labs replay-policy run.labs --policy new-policy.json
 inspect-labs attach run.labs --sample SAMPLE_UUID --observation result.json --output run.late.labs
+inspect-labs monitor run.eval --evidence run.labs
 ```
 
 `run` supports measurement and handoff reference tasks. Other tasks use native
