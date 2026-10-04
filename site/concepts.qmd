@@ -31,6 +31,7 @@ eval log) and adds a few for what Inspect does not cover.
 | **Lab scorer** | A pure function of the agent's report and the lab log, installed as a native Inspect scorer and reused for rescoring | Built |
 | **Outcome** | Completed, not completed or unknown. Unknown is never counted as success or failure. | Built |
 | **Lab log** | What the evaluator recorded from the Lab, independently of the agent, saved as the `.labs` file next to the eval log so the run can be rescored later | Built |
+| **Gateway** | The one place where each agent action is checked against the rules, held for approval if needed, recorded, and can be stopped; used both in evaluations and when a Lab is served to an agent | Built |
 | **Monitor** | A small function over a sample's lab log that flags problems, run during an eval or offline on saved runs | Built |
 | **Fidelity** | Whether a result came from a simulator, a digital twin or real hardware; recorded in every lab log | Built |
 | **Action type** | Whether an operation only reads, can be undone, cannot be undone, or leaves the lab; checked before each action when a task uses action rules | Built |

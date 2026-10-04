@@ -24,7 +24,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Literal, TypeVar
 
-from pydantic import JsonValue
+from pydantic import BaseModel, ConfigDict, JsonValue
 
 from inspect_labs.actions import Action, ActionRecord, ActionRules, Decision
 from inspect_labs.spec import OperationSpec
@@ -119,3 +119,22 @@ class Gateway:
             raise
         record("ran")
         return result
+
+
+class ApprovedAction(BaseModel):
+    """One action a person approved in advance: a tool and the exact arguments."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    tool: str
+    arguments: dict[str, JsonValue]
+
+
+def approved_actions(approved: list[ApprovedAction]) -> Approver:
+    """Approve held actions that exactly match one approved in advance, and nothing else."""
+
+    def approve(action: Action) -> bool:
+        return any(
+            entry.tool == action.tool and entry.arguments == action.arguments for entry in approved
+        )
+
+    return approve

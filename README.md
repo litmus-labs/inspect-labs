@@ -212,7 +212,7 @@ ASTRAL and RIDArena are read-only references; no code is copied from them.
 ```bash
 uv venv --no-project --python 3.12 .venv
 uv pip install --python .venv/bin/python \
-  -e '.[dev,pylabrobot,robots]' \
+  -e '.[dev,pylabrobot,robots,serve]' \
   -e ./plugins/inspect-labs-opentrons \
   -e './plugins/inspect-labs-commec[dev]' \
   -e ./plugins/inspect-labs-plate-reader \

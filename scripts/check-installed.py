@@ -69,6 +69,7 @@ def verify_installed(work: Path, python: Path) -> None:
     assert "commec-review" in listing["lab"]
     assert "plate-reader-qc" in listing["lab"]
     assert "sila-mock-reader" in listing["lab"]
+    run([str(bin_dir / "inspect-labs"), "serve", "--help"], cwd=work, log=work / "serve-help.log")
     assert {"opentrons-ot2", "opentrons-ot2-simulator"} <= set(listing["backend"])
     run(
         [str(bin_dir / "inspect-labs"), "doctor", "--lab", "plate-reader-qc"],
@@ -367,7 +368,7 @@ def main() -> None:
                 "install",
                 "--python",
                 str(python),
-                *(f"{path}[robots]" if path == core else str(path) for path in distributions),
+                *(f"{path}[robots,serve]" if path == core else str(path) for path in distributions),
             ],
             cwd=external_path,
             log=work / "install.log",

@@ -52,6 +52,9 @@ website:
           contents:
             - authoring.qmd
             - evidence.qmd
+        - section: "Using Labs with agents"
+          contents:
+            - serve.qmd
     - id: labs
       title: "Labs"
       contents:

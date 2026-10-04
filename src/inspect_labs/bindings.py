@@ -303,43 +303,62 @@ def _persist_latch(latch: Path, reason: str) -> None:
         )
 
 
+async def record_lab_log(
+    sample_id: str,
+    lab: Lab,
+    info: LabInfo,
+    actions: list[ActionRecord],
+    observation_timeout: float = 30,
+) -> LabLog:
+    """Read what the Lab did and return one hash-chained lab log entry.
+
+    Used by evaluations and by served sessions, so both record the same way. A Lab
+    that cannot be observed gives a lab log with ``observation_error`` set, which is
+    scored as unknown.
+    """
+    links: list[ArtifactLink] = []
+    try:
+        with anyio.fail_after(observation_timeout):
+            payload = await lab.observe()
+        links = [
+            ArtifactLink(path=str(path.resolve()), sha256=artifact_digest(path))
+            for path in lab.artifacts
+        ]
+        record = LabLog(
+            sample_uuid=sample_id,
+            environment=_with_fidelity(info),
+            collected_at=datetime.now(UTC).isoformat(),
+            payload=payload,
+            artifacts=links,
+            safety_abort=_safety_abort(lab),
+            actions=list(actions),
+        )
+    except Exception as exc:
+        # Lab observation is an external boundary. Keep unavailable facts unknown,
+        # and keep potentially sensitive provider exception text private.
+        record = LabLog(
+            sample_uuid=sample_id,
+            environment=_with_fidelity(info),
+            collected_at=datetime.now(UTC).isoformat(),
+            payload=None,
+            observation_error=type(exc).__name__,
+            safety_abort=_safety_abort(lab),
+            actions=list(actions),
+        )
+    return record.model_copy(update={"chain_sha256": lab_log_hash(record)})
+
+
 async def _observe(sample_uuid: str) -> None:
     session = _sessions.get(sample_uuid)
     if session is None or session.evidence is not None:
         return
-    error = None
-    payload = None
-    links: list[ArtifactLink] = []
-    try:
-        with anyio.fail_after(session.observation_timeout):
-            payload = await session.environment.observe()
-        links = [
-            ArtifactLink(path=str(path.resolve()), sha256=artifact_digest(path))
-            for path in session.environment.artifacts
-        ]
-        evidence = LabLog(
-            sample_uuid=sample_uuid,
-            environment=_with_fidelity(session.info),
-            collected_at=datetime.now(UTC).isoformat(),
-            payload=payload,
-            artifacts=links,
-            safety_abort=_safety_abort(session.environment),
-            actions=list(session.actions),
-        )
-    except Exception as exc:
-        # Provider observation is an external boundary. Keep unavailable facts
-        # unknown, and keep potentially sensitive provider exception text private.
-        error = type(exc).__name__
-        evidence = LabLog(
-            sample_uuid=sample_uuid,
-            environment=_with_fidelity(session.info),
-            collected_at=datetime.now(UTC).isoformat(),
-            payload=None,
-            observation_error=error,
-            safety_abort=_safety_abort(session.environment),
-            actions=list(session.actions),
-        )
-    evidence = evidence.model_copy(update={"chain_sha256": lab_log_hash(evidence)})
+    evidence = await record_lab_log(
+        sample_uuid,
+        session.environment,
+        session.info,
+        session.actions,
+        session.observation_timeout,
+    )
     _write_private(session.directory / f"{sample_uuid}.lab-sample", evidence)
     session.evidence = evidence
 
@@ -820,29 +839,70 @@ def read_lab_logs(evidence_file: Path) -> LabLogFile:
     """
     bundle = LabLogFile.model_validate_json(evidence_file.read_text())
     if bundle.schema_version >= 3:
-        for record in bundle.samples.values():
-            if record.chain_sha256 is None or lab_log_hash(record) != record.chain_sha256:
-                raise ValueError("Lab log hash mismatch")
+        _check_chains(bundle.samples)
     return bundle
 
 
-def replay_rules(evidence_file: Path, policy: ActionRules) -> dict[str, list[ReplayedDecision]]:
-    """Re-decide every saved action in a run under ``policy``, running nothing.
+class LabSessionLog(BaseModel):
+    """The lab log file of one served session (`inspect-labs serve`)."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["session"] = "session"
+    schema_version: Literal[1] = 1
+    lab: str
+    rules_version: str
+    framework_version: str
+    started_at: str
+    ended_at: str
+    stopped: str | None = None
+    """Why the session was stopped, if an operator stopped it."""
+    samples: dict[str, LabLog]
+    """One lab log per session, keyed by session id."""
+    flags: list[Flag] = Field(default_factory=list)
+
+
+def _check_chains(samples: dict[str, LabLog]) -> None:
+    for record in samples.values():
+        if record.chain_sha256 is None or lab_log_hash(record) != record.chain_sha256:
+            raise ValueError("Lab log hash mismatch")
+
+
+def read_session_log(path: Path) -> LabSessionLog:
+    """Read a served session's lab log file and check its hash chain.
+
+    Raises:
+        ValueError: A record does not match its hash chain.
+        OSError: The file is unavailable.
+    """
+    log = LabSessionLog.model_validate_json(path.read_text())
+    _check_chains(log.samples)
+    return log
+
+
+def _read_any_lab_logs(path: Path) -> dict[str, LabLog]:
+    """Lab logs from an evaluation's ``.labs`` file or a served session's log file."""
+    document = json.loads(path.read_text())
+    if isinstance(document, dict) and document.get("kind") == "session":
+        return read_session_log(path).samples
+    return read_lab_logs(path).samples
+
+
+def replay_rules(lab_log_file: Path, rules: ActionRules) -> dict[str, list[ReplayedDecision]]:
+    """Re-decide every saved action under other ``rules``, running nothing.
 
     Args:
-        evidence_file: The run's ``.labs`` file.
-        policy: The changed policy to test against past actions.
+        lab_log_file: An evaluation's ``.labs`` file or a served session's lab log file.
+        rules: The changed rules to test against past actions.
 
     Returns:
-        Replayed decisions per sample, in action order.
+        Replayed decisions per sample or session, in action order.
 
     Raises:
         ValueError: The lab log fails its hash check.
     """
-    bundle = read_lab_logs(evidence_file)
     return {
-        uuid: replay_decisions(record.actions, policy, record.environment.operations)
-        for uuid, record in bundle.samples.items()
+        key: replay_decisions(record.actions, rules, record.environment.operations)
+        for key, record in _read_any_lab_logs(lab_log_file).items()
     }
 
 

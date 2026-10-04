@@ -17,8 +17,9 @@ import anyio
 from inspect_ai import eval
 from inspect_ai.log import read_eval_log
 from inspect_ai.model import ModelCost, ModelInfo, get_model_info, set_model_info
+from pydantic import TypeAdapter
 
-from inspect_labs.actions import ActionRules
+from inspect_labs.actions import DEFAULT_RULES, ActionRules
 from inspect_labs.bindings import (
     EvidenceJudge,
     LabLogFile,
@@ -29,9 +30,11 @@ from inspect_labs.bindings import (
 )
 from inspect_labs.conformance import diagnose
 from inspect_labs.evidence import rescore_evidence
+from inspect_labs.gateway import ApprovedAction, approved_actions
 from inspect_labs.liquid_tasks import serial_dilution_outcome, worklist_outcome
 from inspect_labs.monitors import DEFAULT_MONITORS
-from inspect_labs.plugins import Kind, available, canonical
+from inspect_labs.plugins import Kind, available, canonical, resolve
+from inspect_labs.serve import LabSession, serve_over_stdio
 from inspect_labs.tasks import (
     handoff,
     handoff_outcome,
@@ -116,6 +119,33 @@ def main() -> None:
         "runs the named code; it is chosen by you, never read from the evidence file. "
         "--judge is an earlier spelling.",
     )
+    serve = commands.add_parser(
+        "serve", help="Serve a Lab to an MCP agent over stdio, every action through the gateway"
+    )
+    serve.add_argument("--lab", required=True, help="Registered Lab name (see inspect-labs list)")
+    serve.add_argument(
+        "--lab-dir",
+        type=Path,
+        default=Path(".research/serve-lab"),
+        help="The Lab's working directory",
+    )
+    serve.add_argument("--rules", type=Path, help="Action rules as JSON (default: DEFAULT_RULES)")
+    serve.add_argument(
+        "--approvals",
+        type=Path,
+        help="Actions approved in advance, as a JSON list of {tool, arguments}",
+    )
+    serve.add_argument(
+        "--stop-file",
+        type=Path,
+        help="Stop the session when this file appears (its text is the reason)",
+    )
+    serve.add_argument(
+        "--lab-log",
+        type=Path,
+        required=True,
+        help="Where to write the session's lab log (never overwritten)",
+    )
     monitor = commands.add_parser(
         "monitor", help="Run the default monitors on a saved run and list their flags"
     )
@@ -151,6 +181,10 @@ def main() -> None:
     robot = commands.add_parser("robot-mock", help="Run the optional native robot mock baseline")
     robot.add_argument("--log-dir", type=Path, default=Path(".research/runs/robot-mock"))
     args = parser.parse_args()
+    if args.command == "serve":
+        # MCP over stdio owns stdin and stdout, so serving runs before the stdout redirect.
+        _serve(parser, args)
+        return
     old_umask = os.umask(0o077)
     # Native Inspect prints console banners to stdout; reserve it for this command's JSON.
     stdout = sys.stdout
@@ -388,6 +422,44 @@ def main() -> None:
                 raise SystemExit(
                     "Native evaluation failed; private logs and provider evidence retained"
                 )
+    finally:
+        os.umask(old_umask)
+
+
+def _serve(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    """Serve one Lab session over MCP stdio and report the lab log on stderr."""
+    old_umask = os.umask(0o077)
+    try:
+        try:
+            lab = resolve("lab", args.lab, directory=args.lab_dir)
+            rules = (
+                ActionRules.model_validate_json(args.rules.read_text())
+                if args.rules
+                else DEFAULT_RULES
+            )
+            approver = None
+            if args.approvals:
+                approved = TypeAdapter(list[ApprovedAction]).validate_json(
+                    args.approvals.read_text()
+                )
+                approver = approved_actions(approved)
+        except (LookupError, ValueError, OSError) as exc:
+            parser.error(f"Cannot serve: {type(exc).__name__}: {exc}")
+        session = LabSession(lab, rules, approver=approver, stop_file=args.stop_file)
+        log = anyio.run(serve_over_stdio, session, args.lab_log)
+        (record,) = log.samples.values()
+        print(
+            json.dumps(
+                {
+                    "lab_log": str(args.lab_log),
+                    "actions": len(record.actions),
+                    "refused": sum(1 for a in record.actions if a.status == "refused"),
+                    "flags": len(log.flags),
+                    "stopped": log.stopped,
+                }
+            ),
+            file=sys.stderr,
+        )
     finally:
         os.umask(old_umask)
 

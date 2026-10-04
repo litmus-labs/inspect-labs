@@ -65,6 +65,7 @@ inspect-labs rescore run.eval --evidence run.labs --output replay.eval
 inspect-labs replay-rules run.labs --rules new-rules.json
 inspect-labs attach run.labs --sample SAMPLE_UUID --observation result.json --output run.late.labs
 inspect-labs monitor run.eval --evidence run.labs
+inspect-labs serve --lab liquid-handler --lab-log session.json
 ```
 
 `run` supports measurement and handoff reference tasks. Other tasks use native
