@@ -26,8 +26,8 @@ from inspect_ai.tool import Tool, ToolDef
 from pydantic import JsonValue
 
 from inspect_labs.actions import ActionRules
-from inspect_labs.bindings import Lab, LabSessionLog, _write_private, record_lab_log
-from inspect_labs.gateway import ActionRefused, Approver, Gateway
+from inspect_labs.bindings import Lab, LabSessionLog, _write_private, lab_checks, record_lab_log
+from inspect_labs.gateway import ActionRefused, Approver, Check, Gateway
 from inspect_labs.monitors import DEFAULT_MONITORS, Monitor, MonitorInput, run_monitors
 
 if TYPE_CHECKING:
@@ -44,6 +44,7 @@ class LabSession:
         monitors: Run on the session's lab log when it finishes.
         stop_file: If this file exists before an action, the session stops; the
             file's text is recorded as the reason.
+        checks: Domain checks run after the rules, together with the Lab's own.
     """
 
     def __init__(
@@ -54,6 +55,7 @@ class LabSession:
         approver: Approver | None = None,
         monitors: Sequence[Monitor] = DEFAULT_MONITORS,
         stop_file: Path | None = None,
+        checks: Sequence[Check] = (),
     ) -> None:
         self.lab = lab
         self.info = lab.info
@@ -62,7 +64,9 @@ class LabSession:
         self.stop_file = stop_file
         self.session_id = str(uuid.uuid4())
         self.started_at = datetime.now(UTC).isoformat()
-        self.gateway = Gateway(self.info.operations, rules, approver)
+        self.gateway = Gateway(
+            self.info.operations, rules, approver, checks=(*lab_checks(lab), *checks)
+        )
         self._tools: dict[str, Tool] = {ToolDef(tool).name: tool for tool in lab.tools}
 
     def stop(self, reason: str) -> None:
@@ -125,6 +129,7 @@ class LabSession:
             observed=record.observation_error is None and record.payload is not None,
             report=None,
             scores={},
+            observation=record.payload,
         )
         log = LabSessionLog(
             lab=self.info.name,

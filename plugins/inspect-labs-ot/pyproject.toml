@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling>=1.25,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "inspect-labs-ot"
+version = "0.1.0.dev0"
+description = "Labs for the OT AI Assurance Lab's simulated water plant, for native Inspect evaluations"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+# The OT AI Assurance Lab is not a package; point OT_ASSURANCE_LAB at a checkout.
+dependencies = ["inspect-labs", "numpy>=1.26"]
+
+[project.entry-points.inspect_ai]
+inspect_labs_ot = "inspect_labs_ot.tasks"
+
+[project.entry-points."inspect_labs.labs"]
+ot-water-plant = "inspect_labs_ot.lab:ot_water_plant"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inspect_labs_ot"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "LICENSE", "pyproject.toml"]
