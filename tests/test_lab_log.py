@@ -1,6 +1,7 @@
 """Tamper-evident lab logs (schema 3) and replaying a policy change without running anything."""
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -179,3 +180,54 @@ def test_cli_replay_policy_reports_changes_and_refuses_tampered_logs(run, tmp_pa
         [*command, "--policy", str(policy)], capture_output=True, text=True, check=False
     )
     assert refused.returncode == 2 and "Lab log hash mismatch" in refused.stderr
+
+
+def test_fidelity_is_recorded_in_the_lab_log(run):
+    _, labs = run
+    (record,) = read_lab_logs(labs).samples.values()
+    assert record.environment.mode == "simulation"
+    assert record.environment.fidelity == "simulator"
+
+
+def test_adding_a_defaulted_field_does_not_change_old_digests(tmp_path):
+    from inspect_labs.tasks import measurement
+
+    log = eval(
+        measurement(scripted=True, evidence_dir=str(tmp_path / "e")),
+        model="mockllm/model",
+        log_dir=str(tmp_path / "logs"),
+        display="none",
+    )[0]
+    labs = Path(log.location).with_suffix(".labs")
+    document = json.loads(labs.read_text())
+    (sample,) = document["samples"].values()
+    # A computation Lab records no fidelity: written exactly as a lab log from before
+    # the field existed. It must still verify.
+    assert sample["environment"].pop("fidelity", None) is None
+    sample.pop("late_observations", None)
+    labs.write_text(json.dumps(document))
+    (record,) = read_lab_logs(labs).samples.values()
+    assert record.chain_sha256 == lab_log_digest(record)
+
+
+def test_digest_is_the_same_in_every_process(run):
+    _, labs = run
+    script = (
+        "import sys\n"
+        "from inspect_labs.bindings import read_lab_logs\n"
+        "from pathlib import Path\n"
+        "(record,) = read_lab_logs(Path(sys.argv[1])).samples.values()\n"
+        "print(record.chain_sha256)\n"
+    )
+    digests = set()
+    for seed in ("1", "2", "3", "4"):
+        result = subprocess.run(
+            [sys.executable, "-c", script, str(labs)],
+            capture_output=True,
+            text=True,
+            check=False,
+            env={**os.environ, "PYTHONHASHSEED": seed},
+        )
+        assert result.returncode == 0, result.stderr
+        digests.add(result.stdout.strip())
+    assert len(digests) == 1

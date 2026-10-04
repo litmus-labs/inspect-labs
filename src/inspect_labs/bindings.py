@@ -52,6 +52,18 @@ class EnvironmentInfo(BaseModel):
     operations: dict[str, OperationSpec] = Field(default_factory=dict)
     notes: str = ""
     """Honest operating notes for agents and operators (hardware, units, limits)."""
+    fidelity: Literal["simulator", "twin", "hardware"] | None = None
+    """How close to real equipment results are. Declare ``twin`` for a digital twin of
+    a specific instrument. When not set, the lab log records it from ``mode``
+    (simulation: simulator, physical: hardware; none for computation)."""
+
+
+def _with_fidelity(info: EnvironmentInfo) -> EnvironmentInfo:
+    """Record fidelity explicitly in the lab log, derived from mode when not declared."""
+    if info.fidelity is not None:
+        return info
+    derived = {"simulation": "simulator", "physical": "hardware"}.get(info.mode)
+    return info if derived is None else info.model_copy(update={"fidelity": derived})
 
     @field_serializer("capabilities")
     def _sorted_capabilities(self, capabilities: frozenset[str]) -> list[str]:
@@ -146,10 +158,21 @@ def run_time_digest(record: LabEvidence) -> str:
 
     This is the digest at the end of the run, also stored in the native log.
     """
-    entries: list[dict[str, Any]] = [action.model_dump(mode="json") for action in record.actions]
-    entries.append(
-        record.model_dump(mode="json", exclude={"actions", "late_observations", "chain_sha256"})
+    # Fields left at their defaults are omitted, so adding a defaulted field to the
+    # schema later does not change the digest of lab logs written before it.
+    entries: list[dict[str, Any]] = [
+        action.model_dump(mode="json", exclude_defaults=True) for action in record.actions
+    ]
+    observation = record.model_dump(
+        mode="json",
+        exclude={"actions", "late_observations", "chain_sha256"},
+        exclude_defaults=True,
     )
+    # Sets have no stable order across processes; sort them explicitly. (Pydantic
+    # skips field serializers when exclude_defaults is set.)
+    environment = observation["environment"]
+    environment["capabilities"] = sorted(environment["capabilities"])
+    entries.append(observation)
     return _chain(_CHAIN_START, entries)
 
 
@@ -159,7 +182,9 @@ def lab_log_digest(record: LabEvidence) -> str:
     Each step hashes the previous digest with the next entry's canonical JSON, so
     changing, removing or reordering any entry changes the result.
     """
-    late = [entry.model_dump(mode="json") for entry in record.late_observations]
+    late = [
+        entry.model_dump(mode="json", exclude_defaults=True) for entry in record.late_observations
+    ]
     return _chain(run_time_digest(record), late)
 
 
@@ -300,7 +325,7 @@ async def _observe(sample_uuid: str) -> None:
         ]
         evidence = LabEvidence(
             sample_uuid=sample_uuid,
-            environment=session.info,
+            environment=_with_fidelity(session.info),
             collected_at=datetime.now(UTC).isoformat(),
             payload=payload,
             artifacts=links,
@@ -313,7 +338,7 @@ async def _observe(sample_uuid: str) -> None:
         error = type(exc).__name__
         evidence = LabEvidence(
             sample_uuid=sample_uuid,
-            environment=session.info,
+            environment=_with_fidelity(session.info),
             collected_at=datetime.now(UTC).isoformat(),
             payload=None,
             observation_error=error,
