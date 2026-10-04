@@ -1,0 +1,65 @@
+name: Site
+
+# Renders the documentation site and deploys it to Vercel: a preview for each pull
+# request from this repository, production on main. Skips deploys until the
+# VERCEL_TOKEN secret exists.
+on:
+  pull_request:
+    paths: ["site/**", "scripts/check-site.py", ".github/workflows/site.yml"]
+  push:
+    branches: [main]
+    paths: ["site/**", "scripts/check-site.py", ".github/workflows/site.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: site-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERCEL_ORG_ID: team_dTNyddosylyDMAA9axQof7Tp
+  VERCEL_PROJECT_ID: prj_S6MqlpUocBgcWAjlmiDvb8vhzrGH
+
+jobs:
+  deploy:
+    name: Deploy site
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # Forks get no secrets, so only same-repository pull requests deploy previews.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2
+        with:
+          version: "1.10.18"
+      - name: Render and check links
+        run: |
+          quarto render site
+          python3 scripts/check-site.py
+      - name: Deploy
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          PRODUCTION: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+        working-directory: site
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::notice::VERCEL_TOKEN is not set; skipping deploy."
+            exit 0
+          fi
+          flags=""
+          if [ "$PRODUCTION" = "true" ]; then flags="--prod"; fi
+          url=$(npx --yes vercel@56 deploy $flags --yes --token "$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $url" >> "$GITHUB_STEP_SUMMARY"
+      - name: Comment preview link
+        if: github.event_name == 'pull_request' && steps.deploy.outputs.url != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} \
+            --edit-last --create-if-none --body "Site preview: $URL"

@@ -1,14 +1,58 @@
 name: CI
 
+# Runs once per change: on pull requests, and on pushes to main after merge.
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# A newer push to the same branch cancels the older run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PACKAGES: >-
+    -e .[dev,pylabrobot,robots,serve]
+    -e ./plugins/inspect-labs-opentrons
+    -e ./plugins/inspect-labs-commec[dev]
+    -e ./plugins/inspect-labs-plate-reader
+    -e ./plugins/inspect-labs-sila
+  PLUGIN_TESTS: >-
+    plugins/inspect-labs-opentrons/tests
+    plugins/inspect-labs-commec/tests
+    plugins/inspect-labs-plate-reader/tests
+    plugins/inspect-labs-sila/tests
+
 jobs:
-  verify:
+  lint:
+    name: Lint and types
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.11.31"
+          enable-cache: true
+      - name: Install
+        run: |
+          uv python install 3.12
+          uv venv --no-project --python 3.12 .venv
+          uv pip install --python .venv/bin/python $PACKAGES
+      - name: Ruff
+        run: |
+          .venv/bin/ruff check src tests examples scripts plugins
+          .venv/bin/ruff format --check src tests examples scripts plugins
+      - name: Strict types
+        run: .venv/bin/mypy --strict src/inspect_labs plugins/*/src
+
+  tests:
+    name: Tests
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -16,26 +60,35 @@ jobs:
       - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
         with:
           version: "0.11.31"
-      - name: Install Python and development dependencies
+          enable-cache: true
+      - name: Install
         run: |
           uv python install 3.12
           uv venv --no-project --python 3.12 .venv
-          uv pip install --python .venv/bin/python \
-            -e '.[dev,pylabrobot,robots,serve]' \
-            -e ./plugins/inspect-labs-opentrons \
-            -e './plugins/inspect-labs-commec[dev]' \
-            -e ./plugins/inspect-labs-plate-reader \
-            -e ./plugins/inspect-labs-sila
-      - name: Tests
-        run: .venv/bin/python -m pytest tests plugins/inspect-labs-opentrons/tests plugins/inspect-labs-commec/tests plugins/inspect-labs-plate-reader/tests plugins/inspect-labs-sila/tests
-      - name: Lint and types
+          uv pip install --python .venv/bin/python $PACKAGES
+      - name: Pytest
+        run: .venv/bin/python -m pytest tests $PLUGIN_TESTS
+
+  installed:
+    name: Installed packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.11.31"
+          enable-cache: true
+      - name: Install
         run: |
-          .venv/bin/ruff check src tests examples scripts plugins/inspect-labs-opentrons plugins/inspect-labs-commec plugins/inspect-labs-plate-reader plugins/inspect-labs-sila
-          .venv/bin/mypy --strict src/inspect_labs plugins/inspect-labs-opentrons/src plugins/inspect-labs-commec/src plugins/inspect-labs-plate-reader/src plugins/inspect-labs-sila/src
-      - name: Installed wheels and native controls
+          uv python install 3.12
+          uv venv --no-project --python 3.12 .venv
+          uv pip install --python .venv/bin/python $PACKAGES
+      - name: Build wheels, install outside the checkout, run controls and replay
         run: .venv/bin/python scripts/check-installed.py
 
   documentation:
+    name: Documentation site
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -43,7 +96,7 @@ jobs:
       - uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2
         with:
           version: "1.10.18"
-      - name: Render and check the documentation site
+      - name: Render and check links
         run: |
           quarto render site
           python3 scripts/check-site.py
