@@ -11,7 +11,7 @@ import os
 import re
 import typing
 import warnings
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from importlib.metadata import version
@@ -28,13 +28,13 @@ from inspect_ai.tool import Tool, ToolDef, ToolError
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_serializer
 
 from inspect_labs.actions import (
-    Action,
     ActionPolicy,
     ActionRecord,
     ReplayedDecision,
     replay_decisions,
 )
 from inspect_labs.errors import CompatibilityError, SafetyAbort
+from inspect_labs.gateway import ActionRefused, Approver, Gateway
 from inspect_labs.monitors import Flag, Monitor, MonitorInput, run_monitors
 from inspect_labs.spec import OperationSpec, Requirements, compatibility_problems
 
@@ -571,53 +571,15 @@ evidence_scorer = lab_scorer
 """Earlier name of `lab_scorer`."""
 
 
-Approver = Callable[[Action], bool | Awaitable[bool]]
-"""Called for a held action; returns True only if a person approved it."""
-
-
-def _checked_tool(
-    tool: Tool,
-    session: _Session,
-    policy: ActionPolicy,
-    approver: Approver | None,
-) -> Tool:
-    """Wrap a Lab tool so each call is checked and recorded before it reaches the Lab."""
+def _checked_tool(tool: Tool, gateway: Gateway) -> Tool:
+    """Wrap a Lab tool so each call goes through the gateway before it reaches the Lab."""
     definition = ToolDef(tool)
-    operations = session.info.operations
 
     async def run(**arguments: Any) -> Any:
-        requested_at = datetime.now(UTC).isoformat()
-        action = Action.of(definition.name, arguments, operations)
-        decision = policy.decide(action, operations)
-        approved: bool | None = None
-        if decision.outcome == "hold":
-            granted = approver(action) if approver is not None else False
-            approved = bool(await granted if inspect.isawaitable(granted) else granted)
-
-        def record(status: Literal["ran", "refused", "error"]) -> None:
-            session.actions.append(
-                ActionRecord(
-                    sequence=len(session.actions) + 1,
-                    requested_at=requested_at,
-                    action=action,
-                    policy_version=policy.version,
-                    decision=decision,
-                    approved=approved,
-                    status=status,
-                )
-            )
-
-        if decision.outcome == "deny" or (decision.outcome == "hold" and not approved):
-            record("refused")
-            why = "needs a person's approval" if decision.outcome == "hold" else "refused"
-            raise ToolError(f"Action {why} by lab policy ({decision.rule}): {decision.reason}")
         try:
-            result = await tool(**arguments)
-        except BaseException:
-            record("error")
-            raise
-        record("ran")
-        return result
+            return await gateway.run(definition.name, arguments, lambda: tool(**arguments))
+        except ActionRefused as exc:
+            raise ToolError(str(exc)) from exc
 
     # Inspect maps tool-call arguments by the function's signature, so the wrapper
     # presents the original tool's parameters rather than **arguments.
@@ -737,10 +699,10 @@ def bind_task(
             _sessions[state.uuid] = session
             lab_tools = provider.tools
             if action_policy is not None:
-                lab_tools = [
-                    _checked_tool(lab_tool, session, action_policy, approver)
-                    for lab_tool in lab_tools
-                ]
+                gateway = Gateway(
+                    session.info.operations, action_policy, approver, records=session.actions
+                )
+                lab_tools = [_checked_tool(lab_tool, gateway) for lab_tool in lab_tools]
             state.tools = [*state.tools, *lab_tools]
             return state
 

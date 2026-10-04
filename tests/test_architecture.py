@@ -22,6 +22,7 @@ def test_declared_module_inventory_and_dependencies() -> None:
         "spec": {"pydantic"},
         "actions": {"pydantic", "inspect_labs.spec"},
         "monitors": {"pydantic", "inspect_labs.actions"},
+        "gateway": {"pydantic", "inspect_labs.actions", "inspect_labs.spec"},
         "liquid": {"pydantic"},
         "liquid_handling": {
             "inspect_ai",
@@ -50,6 +51,7 @@ def test_declared_module_inventory_and_dependencies() -> None:
             "inspect_ai",
             "inspect_labs.actions",
             "inspect_labs.bindings",
+            "inspect_labs.gateway",
             "inspect_labs.liquid_tasks",
             "inspect_labs.monitors",
         },
@@ -87,6 +89,7 @@ def test_declared_module_inventory_and_dependencies() -> None:
             "anyio",
             "inspect_labs.actions",
             "inspect_labs.errors",
+            "inspect_labs.gateway",
             "inspect_labs.monitors",
             "inspect_labs.spec",
         },

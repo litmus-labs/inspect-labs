@@ -28,7 +28,8 @@ from inspect_ai.dataset import Sample
 from inspect_ai.solver import generate
 
 from inspect_labs.actions import DEFAULT_ACTION_POLICY, Action
-from inspect_labs.bindings import Approver, bind_task
+from inspect_labs.bindings import bind_task
+from inspect_labs.gateway import Approver
 from inspect_labs.liquid_tasks import (
     WORKLIST_METRICS,
     WorklistLine,
