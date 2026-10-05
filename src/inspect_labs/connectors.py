@@ -29,6 +29,7 @@ from __future__ import annotations
 import hashlib
 import inspect
 import json
+import keyword
 import os
 import re
 from collections.abc import Awaitable, Callable, Mapping
@@ -246,21 +247,55 @@ _JSON_TYPES: dict[str, Any] = {
 }
 
 
+def _aliases(schema: Mapping[str, Any]) -> dict[str, str]:
+    """Python-safe names for a tool's arguments, mapped to the connector's own names.
+
+    JSON Schema allows names like ``query-string`` or ``class`` that can't be Python
+    parameters; the agent sees a safe alias, translated back for the connector.
+    """
+    names = list((schema.get("properties") or {}).keys())
+    aliases: dict[str, str] = {}
+    for name in names:
+        alias = name
+        if not name.isidentifier() or keyword.iskeyword(name):
+            alias = re.sub(r"\W", "_", name)
+            if not alias or not (alias[0].isalpha() or alias[0] == "_"):
+                alias = f"arg_{alias}"
+            if keyword.iskeyword(alias):
+                alias += "_"
+            base, number = alias, 2
+            while alias in aliases or (alias in names and alias != name):
+                alias, number = f"{base}_{number}", number + 1
+        aliases[alias] = name
+    return aliases
+
+
+def _alias_of(schema: Mapping[str, Any], original: str) -> str:
+    """The agent-facing name of one of the connector's argument names."""
+    return next((a for a, o in _aliases(schema).items() if o == original), original)
+
+
 def _tool_params(schema: Mapping[str, Any]) -> ToolParams:
-    properties = dict(schema.get("properties") or {})
+    aliases = {original: alias for alias, original in _aliases(schema).items()}
+    properties = {
+        aliases[name]: spec for name, spec in dict(schema.get("properties") or {}).items()
+    }
+    required = [aliases.get(name, name) for name in schema.get("required") or []]
     for name, spec in properties.items():
         if isinstance(spec, dict) and not spec.get("description"):
             properties[name] = {**spec, "description": name.replace("_", " ")}
     return ToolParams.model_validate(
-        {"type": "object", "properties": properties, "required": list(schema.get("required") or [])}
+        {"type": "object", "properties": properties, "required": required}
     )
 
 
 def _signature(schema: Mapping[str, Any]) -> inspect.Signature:
     properties = schema.get("properties") or {}
-    required = set(schema.get("required") or [])
+    aliases = {original: alias for alias, original in _aliases(schema).items()}
+    required = {aliases.get(name, name) for name in schema.get("required") or []}
     parameters = []
-    for name, spec in properties.items():
+    for original, spec in properties.items():
+        name = aliases[original]
         kind = spec.get("type") if isinstance(spec, dict) else None
         annotation = _JSON_TYPES.get(kind, Any) if isinstance(kind, str) else Any
         if name in required:
@@ -337,7 +372,13 @@ class ConnectorLab:
             mode="computation",
             capabilities=frozenset({f"connector:{profile.name}"}),
             operations={
-                name: OperationSpec(action=tool.action, parameters=tool.parameters)
+                name: OperationSpec(
+                    action=tool.action,
+                    parameters={
+                        _alias_of(tool.input_schema, key): spec
+                        for key, spec in tool.parameters.items()
+                    },
+                )
                 for name, tool in self._offered.items()
             },
             notes=(profile.notes + " " if profile.notes else "")
@@ -362,11 +403,22 @@ class ConnectorLab:
         tool = self._offered.get(action.tool)
         if tool is None or not tool.sequence_arguments:
             return None
-        sequences = [
-            (name, value)
-            for name in tool.sequence_arguments
-            if isinstance(value := action.arguments.get(name), str) and value
-        ]
+        sequences: list[tuple[str, str]] = []
+        for name in tool.sequence_arguments:
+            value = action.arguments.get(_alias_of(tool.input_schema, name))
+            if value is None or value == "":
+                continue
+            if isinstance(value, str):
+                sequences.append((name, value))
+            elif isinstance(value, list) and all(isinstance(v, str) and v for v in value):
+                sequences.extend((name, v) for v in value if isinstance(v, str))
+            else:
+                # Anything else could hide a sequence the screen can't read: refuse.
+                return Decision(
+                    outcome="deny",
+                    rule="sequence-screen:unscreenable",
+                    reason=f"{name} must be a sequence string or a list of them to be screened",
+                )
         if not sequences:
             return None
         if self.screener is None:
@@ -393,9 +445,14 @@ class ConnectorLab:
 
     def _tool(self, name: str, spec: ConnectorTool) -> Tool:
         lab = self
+        aliases = _aliases(spec.input_schema)
 
         async def run(**arguments: Any) -> str:
-            given = {key: value for key, value in arguments.items() if value is not None}
+            given = {
+                aliases.get(key, key): value
+                for key, value in arguments.items()
+                if value is not None
+            }
             problem: Decision | None = None
             result: Any = None
             try:

@@ -47,6 +47,15 @@ TOOLS = [
         input_schema={"type": "object", "properties": {"id": {"type": "string"}}},
     ),
     types.Tool(
+        name="lookup_record",
+        description="Look up a record by an awkwardly named key",
+        input_schema={
+            "type": "object",
+            "properties": {"query-string": {"type": "string"}, "class": {"type": "string"}},
+            "required": ["query-string"],
+        },
+    ),
+    types.Tool(
         name="write_notebook_entry",
         description="Write an entry to the lab notebook",
         annotations=types.ToolAnnotations(read_only_hint=False, destructive_hint=True),
@@ -69,10 +78,13 @@ async def call_tool(ctx, params):
         return types.CallToolResult(
             content=[types.ImageContent(type="image", data="iVBORw0KGgo=", mime_type="image/png")]
         )
+    if params.name == "lookup_record":
+        text = "received " + ", ".join(f"{k}={v}" for k, v in sorted(arguments.items()))
+        return types.CallToolResult(content=[types.TextContent(type="text", text=text)])
     if params.name == "search_literature":
         text = f"3 abstracts about {arguments['query']}: PMID 1, PMID 2, PMID 3"
     elif params.name == "order_sequence":
-        text = f"Order placed for {arguments['name']} ({len(arguments['sequence'])} bp)"
+        text = f"Order placed for {arguments['name']}"
     else:
         text = "Entry written"
     return types.CallToolResult(content=[types.TextContent(type="text", text=text)])

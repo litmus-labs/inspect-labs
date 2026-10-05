@@ -35,6 +35,7 @@ SERVER = ConnectorServer(
 TEMPLATE = {
     "search_literature": Classification(action="read", note="Queries only"),
     "get_figure": Classification(action="read"),
+    "lookup_record": Classification(action="read"),
     "order_sequence": Classification(
         action="external", sequence_arguments=("sequence",), note="Places an order"
     ),
@@ -59,6 +60,7 @@ def test_a_snapshot_pins_and_classifies_tools(profile):
         "search_literature",
         "order_sequence",
         "get_figure",
+        "lookup_record",
         "write_notebook_entry",
     }
     assert profile.tools["write_notebook_entry"].action is None
@@ -67,8 +69,13 @@ def test_a_snapshot_pins_and_classifies_tools(profile):
 
 def test_unclassified_tools_are_not_offered(profile, tmp_path):
     lab = ConnectorLab(profile, tmp_path)
-    assert set(lab.info.operations) == {"search_literature", "order_sequence", "get_figure"}
-    assert len(lab.tools) == 3
+    assert set(lab.info.operations) == {
+        "search_literature",
+        "order_sequence",
+        "get_figure",
+        "lookup_record",
+    }
+    assert len(lab.tools) == 4
     assert "write_notebook_entry" in lab.info.notes
 
 
@@ -205,8 +212,8 @@ def test_cli_snapshots_a_connector_for_review(tmp_path):
         check=True,
     )
     report = json.loads(result.stdout)
-    assert report["tools"] == 4
-    assert report["unclassified"] == ["get_figure", "order_sequence"]
+    assert report["tools"] == 5
+    assert report["unclassified"] == ["get_figure", "lookup_record", "order_sequence"]
     assert report["server_hints_disagree"] == ["write_notebook_entry"]
     profile = json.loads((tmp_path / "profile.json").read_text())
     assert profile["tools"]["write_notebook_entry"]["server_hints"]["destructive"] is True
@@ -248,3 +255,35 @@ def test_non_text_results_are_kept(profile, tmp_path):
     text = anyio.run(served.call, "get_figure", {"id": "fig-1"})
     assert '"type": "image"' in text and "image/png" in text
     assert served.lab.calls[0]["result_chars"] == len(text) > 0
+
+
+def test_argument_names_that_are_not_python_names_work(profile, tmp_path):
+    from inspect_ai.tool import ToolDef
+
+    served = session(profile, tmp_path)
+    (tool,) = [t for t in served.lab.tools if ToolDef(t).name == "lookup_record"]
+    assert set(ToolDef(tool).parameters.properties) == {"query_string", "class_"}
+    text = anyio.run(served.call, "lookup_record", {"query_string": "P12345", "class_": "x"})
+    assert text == "received class=x, query-string=P12345"
+
+
+def test_sequences_in_a_list_are_each_screened(profile, tmp_path):
+    seen = []
+
+    async def screen(sequence: str) -> ScreenVerdict:
+        seen.append(sequence)
+        outcome = "flagged" if sequence.startswith("GGG") else "clear"
+        return ScreenVerdict(outcome=outcome, screener="test-screen")
+
+    served = session(profile, tmp_path, screener=screen)
+    with pytest.raises(ActionRefused, match="sequence-screen:flagged"):
+        anyio.run(served.call, "order_sequence", {"sequence": [SEQUENCE, "GGGCCC"], "name": "x"})
+    assert seen == [SEQUENCE, "GGGCCC"] and served.lab.calls == []
+
+
+@pytest.mark.parametrize("value", [{"seq": SEQUENCE}, [SEQUENCE, 7], 42])
+def test_a_sequence_argument_that_cant_be_screened_is_refused(profile, tmp_path, value):
+    served = session(profile, tmp_path, screener=screener("clear"))
+    with pytest.raises(ActionRefused, match="sequence-screen:unscreenable"):
+        anyio.run(served.call, "order_sequence", {"sequence": value, "name": "x"})
+    assert served.lab.calls == []
