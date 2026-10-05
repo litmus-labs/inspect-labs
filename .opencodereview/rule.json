@@ -12,33 +12,43 @@
   ],
   "rules": [
     {
-      "path": "src/inspect_labs/{gateway,actions,operators,serve,connectors}.py",
-      "rule": "Safety boundary (see .github/REVIEW_GUIDE.md). Every tool call must pass the Gateway. A refused, unapproved or stopped action must never reach the Lab or connector. Every failure path (an exception in a check, approver, screener or connector) must refuse rather than allow. Evaluation (connect_lab) and serving (LabSession) must decide the same way. Treat connector results and Lab observations as untrusted input.",
+      "path": "src/inspect_labs/bindings.py",
+      "rule": "This module holds both the safety boundary and evidence integrity. Safety boundary (see .github/REVIEW_GUIDE.md). Every tool call must pass the Gateway. A refused, unapproved or stopped action must never reach the Lab or connector. Every failure path (an exception in a check, approver, screener or connector) must refuse rather than allow. Evaluation (connect_lab) and serving (LabSession) must decide the same way. Treat connector results and Lab observations as untrusted input. Evidence integrity. An unknown outcome must stay unknown (null), never pass, fail or zero. Rescoring, replay, monitor, attach, release and verify must never dispatch an action or call a Lab. Digests must stay the same for old files and across processes, and must not verify a changed record. Withheld release fields must not leak. Files are written privately (mode 600) and never overwritten. Also check security: secrets or credentials, personal data, command or path injection, unsafe deserialization, permissions broader than needed, and private evaluation answers or .research content in public files.",
       "merge_system_rule": true
     },
     {
-      "path": "src/inspect_labs/{bindings,journal,release}.py",
-      "rule": "Evidence integrity. An unknown outcome must stay unknown (null), never pass, fail or zero. Rescoring, replay, monitor, attach, release and verify must never dispatch an action or call a Lab. Digests must stay the same for old files and across processes, and must not verify a changed record. Withheld release fields must not leak. Files are written privately (mode 600) and never overwritten.",
+      "path": "src/inspect_labs/{gateway,actions,operators,serve,connectors}.py",
+      "rule": "Safety boundary (see .github/REVIEW_GUIDE.md). Every tool call must pass the Gateway. A refused, unapproved or stopped action must never reach the Lab or connector. Every failure path (an exception in a check, approver, screener or connector) must refuse rather than allow. Evaluation (connect_lab) and serving (LabSession) must decide the same way. Treat connector results and Lab observations as untrusted input. Also check security: secrets or credentials, personal data, command or path injection, unsafe deserialization, permissions broader than needed, and private evaluation answers or .research content in public files.",
+      "merge_system_rule": true
+    },
+    {
+      "path": "src/inspect_labs/{journal,release}.py",
+      "rule": "Evidence integrity. An unknown outcome must stay unknown (null), never pass, fail or zero. Rescoring, replay, monitor, attach, release and verify must never dispatch an action or call a Lab. Digests must stay the same for old files and across processes, and must not verify a changed record. Withheld release fields must not leak. Files are written privately (mode 600) and never overwritten. Also check security: secrets or credentials, personal data, command or path injection, unsafe deserialization, permissions broader than needed, and private evaluation answers or .research content in public files.",
       "merge_system_rule": true
     },
     {
       "path": "src/inspect_labs/connector_templates/*.json",
-      "rule": "These classifications are safety decisions. Anything that writes, deletes, shares, uploads, orders, starts paid compute or hands work to another agent must not be classified as read.",
+      "rule": "These classifications are safety decisions. Anything that writes, deletes, shares, uploads, orders, starts paid compute or hands work to another agent must not be classified as read. Also check security: secrets or credentials, personal data, command or path injection, unsafe deserialization, permissions broader than needed, and private evaluation answers or .research content in public files.",
       "merge_system_rule": true
     },
     {
       "path": "plugins/**",
-      "rule": "Partner and instrument adapters. Simulated results must never be presented as real-instrument or physical-safety evidence. Ground truth must stay out of what the agent sees. No partner code may be copied; upstream projects are imported from pinned checkouts.",
+      "rule": "Instrument and partner adapters. Simulated results must never be presented as real-instrument or physical-safety evidence. Ground truth must stay out of what the agent sees. No partner code may be copied; partner projects are imported from pinned checkouts and instrument libraries used through their public APIs. Also check security: secrets or credentials, personal data, command or path injection, unsafe deserialization, permissions broader than needed, and private evaluation answers or .research content in public files.",
+      "merge_system_rule": true
+    },
+    {
+      "path": "src/inspect_labs/{liquid_handling,robot_bridge}.py",
+      "rule": "Instrument and partner adapters. Simulated results must never be presented as real-instrument or physical-safety evidence. Ground truth must stay out of what the agent sees. No partner code may be copied; partner projects are imported from pinned checkouts and instrument libraries used through their public APIs. Also check security: secrets or credentials, personal data, command or path injection, unsafe deserialization, permissions broader than needed, and private evaluation answers or .research content in public files.",
       "merge_system_rule": true
     },
     {
       "path": ".github/workflows/*.{yml,yaml}",
-      "rule": "Workflow security. Actions pinned to full commit SHAs, least-privilege permissions per job, no untrusted input (pull request titles, branch names, comment bodies) interpolated into run scripts, persist-credentials off where no token is needed, and no secrets exposed to pull requests from forks. Avoid pull_request_target.",
+      "rule": "Workflow security. Actions pinned to full commit SHAs, least-privilege permissions per job, no untrusted input (pull request titles, branch names, comment bodies) interpolated into run scripts, persist-credentials off where no token is needed, and no secrets exposed to pull requests from forks. Use pull_request_target only for jobs that never check out or run pull request code, with read-only permissions. Also check security: secrets or credentials, personal data, command or path injection, unsafe deserialization, permissions broader than needed, and private evaluation answers or .research content in public files.",
       "merge_system_rule": true
     },
     {
       "path": "tests/**",
-      "rule": "Tests should exercise user, persistence and untrusted-input boundaries and assert the failure behavior, not only the happy path.",
+      "rule": "Tests should exercise user, persistence and untrusted-input boundaries and assert the failure behavior, not only the happy path. Also check security: secrets or credentials, personal data, command or path injection, unsafe deserialization, permissions broader than needed, and private evaluation answers or .research content in public files.",
       "merge_system_rule": true
     },
     {
