@@ -14,7 +14,7 @@ agent's control and review any artifact before sharing it.
 
 Every pull request is scanned by CodeQL (Python and workflows), by dependency review
 for known vulnerable packages, and by CodeRabbit's security tools. Pushes containing
-secrets are blocked, and Dependabot opens updates for vulnerable dependencies. These
+secrets that match GitHub's supported patterns are blocked, and Dependabot opens updates for vulnerable dependencies. These
 catch common mistakes; they are not a security audit.
 
 ## Reporting a vulnerability

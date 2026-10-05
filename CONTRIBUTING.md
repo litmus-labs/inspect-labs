@@ -36,8 +36,10 @@ changes also get a Vercel preview link.
 
 Security checks run on every pull request too. CodeQL scans the Python code and the
 GitHub Actions workflows (also weekly), dependency review blocks new dependencies
-with known high-severity vulnerabilities, and secret scanning blocks pushes that
-contain credentials. Findings appear under the repository's Security tab.
+with known high-severity vulnerabilities, and GitHub push protection blocks pushes
+containing secrets that match its supported patterns (a contributor can bypass a
+block where the repository allows it, with a reason). Findings appear under the
+repository's Security tab.
 
 Reviews are layered so each catches different problems. All of them check
 [the review guide](.github/REVIEW_GUIDE.md).
