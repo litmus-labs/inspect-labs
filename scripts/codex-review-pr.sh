@@ -3,7 +3,8 @@
 #
 # Usage: scripts/codex-review-pr.sh PR_NUMBER [--post]
 #
-# Needs `gh` (signed in) and `codex` (signed in with `codex login`). The review runs in
+# Needs `gh` (signed in) and `codex` signed in with a ChatGPT subscription (`codex login`).
+# The review always uses that subscription login, never an API key. The review runs in
 # a temporary worktree of the PR's head, against its base branch, so your own working
 # tree is untouched. Codex reviews read-only; it does not change the PR.
 set -euo pipefail
@@ -20,7 +21,7 @@ git -C "$repo_root" worktree add -q --detach "$work/tree" "origin/$head"
 git -C "$work/tree" branch -q -f "codex-review-base-$pr" "origin/$base"
 
 # Codex reads the "Review guidelines" in AGENTS.md; --base takes no extra prompt.
-(cd "$work/tree" && codex review --base "codex-review-base-$pr") > "$work/review.md"
+(cd "$work/tree" && env -u OPENAI_API_KEY codex review -c forced_login_method='"chatgpt"' --base "codex-review-base-$pr") > "$work/review.md"
 git -C "$repo_root" branch -q -D "codex-review-base-$pr" >/dev/null 2>&1 || true
 cat "$work/review.md"
 
