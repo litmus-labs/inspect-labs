@@ -80,6 +80,9 @@ class FakeAgent:
         return Result(True, "")
 
 
+FAST = WorldLogSpec(quiet_seconds=0.1, max_wait_seconds=2)
+
+
 def sandboxes_for(world, agent):
     def lookup(name):
         return world if name in ("world", "fictionet") else agent
@@ -114,7 +117,7 @@ def run(tmp_path: Path, command: str, world: FakeWorld | None = None, **kwargs):
         scorer=sent_to_impostor,
         lab_log_dir=tmp_path / "lab-logs",
         sandboxes=sandboxes_for(world, FakeAgent(world)),
-        **kwargs,
+        **({"spec": FAST} | kwargs),
     )
     model = get_model("mockllm/model", custom_outputs=outputs)
     (log,) = eval(task, model=model, log_dir=str(tmp_path / "logs"), display="none")
@@ -164,7 +167,7 @@ def test_a_world_log_with_dropped_lines_is_incomplete(tmp_path):
     world = FakeWorld()
     start = len(world.log)
     world.write(ts=3.0, type="lost", count=2)
-    read, _ = anyio.run(read_world_log, world, WorldLogSpec(), start)
+    read, _ = anyio.run(read_world_log, world, FAST, start)
     assert not read.complete and "dropped 2 lines" in read.problems[0]
 
 
@@ -199,3 +202,49 @@ def test_the_world_must_be_a_separate_sandbox(tmp_path):
 def test_an_unsafe_log_path_is_rejected():
     with pytest.raises(ValueError):
         WorldLogSpec(log_path="/var/log/x'; rm -rf /")
+
+
+def test_an_event_after_a_short_pause_is_still_included():
+    import anyio
+    from inspect_labs_fictionet.world import read_world_log
+
+    world = FakeWorld()
+    start = len(world.log)
+    spec = WorldLogSpec(quiet_seconds=0.5, max_wait_seconds=5)
+
+    async def scenario():
+        async with anyio.create_task_group() as group:
+
+            async def late_event():
+                await anyio.sleep(0.25)  # longer than one poll, shorter than the window
+                world.write(ts=4.0, type="http", host="bank.example", page="login")
+
+            group.start_soon(late_event)
+            read, _ = await read_world_log(world, spec, start)
+        return read
+
+    read = anyio.run(scenario)
+    assert read.complete and [e["host"] for e in read.events] == ["bank.example"]
+
+
+def test_a_log_that_never_goes_quiet_is_incomplete():
+    import anyio
+    from inspect_labs_fictionet.world import read_world_log
+
+    world = FakeWorld()
+    spec = WorldLogSpec(quiet_seconds=0.3, max_wait_seconds=0.6)
+
+    async def scenario():
+        async with anyio.create_task_group() as group:
+
+            async def chatter():
+                for _ in range(20):
+                    world.write(ts=5.0, type="dns")
+                    await anyio.sleep(0.05)
+
+            group.start_soon(chatter)
+            read, _ = await read_world_log(world, spec, 0)
+        return read
+
+    read = anyio.run(scenario)
+    assert not read.complete and "still growing" in read.problems[0]

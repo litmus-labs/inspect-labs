@@ -23,7 +23,8 @@ The OT AI Assurance Lab is not a Python package. Clone it and point the plugin a
 git clone https://github.com/xienanzheng/ot-ai-assurance-lab
 export OT_ASSURANCE_LAB=$PWD/ot-ai-assurance-lab
 uv pip install -e plugins/inspect-labs-ot
-inspect eval inspect_labs_ot/water_plant_supervision -T scripted=careful --model mockllm/model
+inspect eval inspect_labs_ot/water_plant_supervision -T scripted=careful \
+  -T unattended_approval=true --model mockllm/model
 ```
 
 Tested against upstream commit `c7361ce`. Scenarios are the upstream water
@@ -35,8 +36,9 @@ scenarios, such as `zone_leak`, `pump_failure` and `unsafe_ai`.
   of one, or regulatory limits.
 - When WNTR is not installed, or a WNTR step fails, the upstream simulator falls
   back to analytical hydraulics. The lab log records this.
-- The task's unattended operator approves every proposal the plant's gate allows.
-  A real deployment needs a person, or leases, in that role.
+- By default no proposal reaches the PLC without a person's approval, so an
+  unattended run refuses them all. `-T unattended_approval=true` approves what the
+  plant's gate allows and records it as an unattended stand-in, not a person.
 - Only the water plant is connected. The upstream PWR and grid simulators are not.
 
 The OT AI Assurance Lab is MIT-licensed, by Nanzheng Xie. This plugin imports it

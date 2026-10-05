@@ -105,15 +105,6 @@ class ReleasePolicy(BaseModel):
         best = max(covering, key=lambda r: (len(r.path.split(".")), -r.path.count("*")))
         return best.tier
 
-    def visible_below(self, path: Path_, allowed: set[str]) -> bool:
-        """Whether any field under ``path`` could be kept at these tiers."""
-        patterns = [*STRUCTURAL, *(r.path for r in self.rules if r.tier in allowed)]
-        return any(
-            len(pattern.split(".")) > len(path)
-            and _covers(".".join(pattern.split(".")[: len(path)]), path)
-            for pattern in patterns
-        )
-
 
 def _matches(path: Path_, pattern: str) -> bool:
     wanted = pattern.split(".")
@@ -148,15 +139,28 @@ def _cut(value: Any, path: Path_, allowed: set[str], policy: ReleasePolicy, key:
     if path:
         tier = policy.tier_of(path)
         # A withheld container is withheld whole (hiding its shape too), unless some
-        # field inside it can be kept.
-        container = isinstance(value, (dict, list))
-        if tier not in allowed and (not container or not policy.visible_below(path, allowed)):
+        # field actually inside it is kept.
+        if tier not in allowed and not _keeps_something(value, path, allowed, policy):
             return Withheld(withheld=tier, sha256=_commit(key, path, value)).model_dump()
     if isinstance(value, dict):
         return {k: _cut(v, (*path, str(k)), allowed, policy, key) for k, v in value.items()}
     if isinstance(value, list):
         return [_cut(v, (*path, str(i)), allowed, policy, key) for i, v in enumerate(value)]
     return value
+
+
+def _keeps_something(value: Any, path: Path_, allowed: set[str], policy: ReleasePolicy) -> bool:
+    """Whether any field actually present under ``path`` would be kept."""
+    if isinstance(value, dict):
+        children = [((*path, str(k)), v) for k, v in value.items()]
+    elif isinstance(value, list):
+        children = [((*path, str(i)), v) for i, v in enumerate(value)]
+    else:
+        return False
+    return any(
+        policy.tier_of(child) in allowed or _keeps_something(item, child, allowed, policy)
+        for child, item in children
+    )
 
 
 class Release(BaseModel):
@@ -198,8 +202,16 @@ def release_lab_log(
         key_sha256=hashlib.sha256(key).hexdigest(),
         document=_cut(document, (), allowed, policy, key),
     )
-    _write_new(key_file, key.hex() + "\n")
+    # Write both or neither, so a failed release leaves nothing behind.
+    for path in (output, key_file):
+        if path.exists():
+            raise FileExistsError(f"{path} already exists")
     _write_new(output, release.model_dump_json(indent=2) + "\n")
+    try:
+        _write_new(key_file, key.hex() + "\n")
+    except BaseException:
+        output.unlink(missing_ok=True)
+        raise
     return release
 
 

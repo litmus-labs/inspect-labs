@@ -121,6 +121,11 @@ def test_files_are_never_overwritten_and_tiers_are_checked(lab_log, tmp_path):
         release_lab_log(lab_log, POLICY, "public", tmp_path / "a.json", tmp_path / "k2")
     with pytest.raises(ValueError, match="Unknown tier"):
         release_lab_log(lab_log, POLICY, "secret", tmp_path / "c.json", tmp_path / "k3")
+    # A failed release leaves no key behind.
+    (tmp_path / "taken.json").write_text("{}")
+    with pytest.raises(FileExistsError):
+        release_lab_log(lab_log, POLICY, "public", tmp_path / "taken.json", tmp_path / "k4")
+    assert not (tmp_path / "k4").exists()
     with pytest.raises(ValueError, match="Unknown tier"):
         ReleasePolicy(version="x", rules=(FieldRule(path="lab", tier="secret"),))
 
@@ -158,3 +163,21 @@ def test_cli_releases_and_verifies(lab_log, tmp_path):
         text=True,
     )
     assert verified.returncode == 0 and json.loads(verified.stdout)["faithful"]
+
+
+def test_a_withheld_section_hides_its_shape_unless_something_inside_is_kept(tmp_path):
+    from inspect_labs.release import _cut
+
+    policy = ReleasePolicy(
+        version="x",
+        rules=(
+            FieldRule(path="payload", tier="restricted"),
+            FieldRule(path="payload.summary", tier="public"),
+        ),
+    )
+    key = b"k" * 32
+    without = _cut({"payload": {"raw": [1, 2, 3]}}, (), {"public"}, policy, key)
+    assert set(without["payload"]) == {"withheld", "sha256"}
+    present = _cut({"payload": {"raw": [1, 2, 3], "summary": "ok"}}, (), {"public"}, policy, key)
+    assert present["payload"]["summary"] == "ok"
+    assert set(present["payload"]["raw"]) == {"withheld", "sha256"}
