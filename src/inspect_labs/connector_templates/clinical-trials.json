@@ -1,0 +1,30 @@
+{
+  "connector": "clinical-trials",
+  "server": {
+    "url": "https://hcls.mcp.claude.com/clinical_trials/mcp",
+    "official_manifest_url": "https://mcp.deepsense.ai/clinical_trials/mcp"
+  },
+  "source": "https://github.com/anthropics/life-sciences",
+  "confirmed": "tools/list, 2026-10-04",
+  "notes": "No sign-in. Anthropic's life-sciences manifest points at official_manifest_url, which refused anonymous requests (403) on 2026-10-04; the Anthropic-hosted url answered without sign-in.",
+  "tools": {
+    "search_trials": {
+      "action": "read"
+    },
+    "get_trial_details": {
+      "action": "read"
+    },
+    "search_by_sponsor": {
+      "action": "read"
+    },
+    "search_investigators": {
+      "action": "read"
+    },
+    "analyze_endpoints": {
+      "action": "read"
+    },
+    "search_by_eligibility": {
+      "action": "read"
+    }
+  }
+}

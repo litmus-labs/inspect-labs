@@ -1,0 +1,26 @@
+{
+  "connector": "open-targets",
+  "server": {
+    "url": "https://mcp.platform.opentargets.org/mcp"
+  },
+  "source": "https://github.com/anthropics/life-sciences",
+  "confirmed": "tools/list, 2026-10-04",
+  "notes": "No sign-in.",
+  "tools": {
+    "get_open_targets_graphql_schema": {
+      "action": "read"
+    },
+    "get_type_dependencies": {
+      "action": "read"
+    },
+    "search_entities": {
+      "action": "read"
+    },
+    "query_open_targets_graphql": {
+      "action": "read"
+    },
+    "batch_query_open_targets_graphql": {
+      "action": "read"
+    }
+  }
+}

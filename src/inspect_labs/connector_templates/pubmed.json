@@ -1,0 +1,32 @@
+{
+  "connector": "pubmed",
+  "server": {
+    "url": "https://pubmed.mcp.claude.com/mcp"
+  },
+  "source": "https://github.com/anthropics/life-sciences",
+  "confirmed": "tools/list, 2026-10-04",
+  "notes": "Anthropic-hosted PubMed connector. No sign-in.",
+  "tools": {
+    "search_articles": {
+      "action": "read"
+    },
+    "get_article_metadata": {
+      "action": "read"
+    },
+    "find_related_articles": {
+      "action": "read"
+    },
+    "lookup_article_by_citation": {
+      "action": "read"
+    },
+    "convert_article_ids": {
+      "action": "read"
+    },
+    "get_full_text_article": {
+      "action": "read"
+    },
+    "get_copyright_status": {
+      "action": "read"
+    }
+  }
+}

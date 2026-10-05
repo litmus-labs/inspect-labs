@@ -36,3 +36,18 @@ The parent is the sole source writer unless it assigns a disjoint implementation
 ## Context and progress
 
 pi-goal-x owns milestones. Todos track only immediate session work. ACP remains the sole context manager. Save durable evidence before folding consumed context. Do not rerun timed-out or unchanged failing calls without a new hypothesis.
+
+## Review guidelines
+
+Review against `.github/REVIEW_GUIDE.md`. Report only real problems, each with file and line, severity and a concrete failure scenario:
+
+- an unknown outcome scored as known, or a missing result treated as pass, fail or zero;
+- rescoring, replay, monitor, attach, release or verify dispatching an action or calling a Lab;
+- a path where a refused, unapproved or stopped action still reaches the Lab, or a safety check that fails open;
+- lab log, journal or release digests that change for old files, differ across processes or can verify a changed record;
+- evaluation and serving deciding differently for the same action;
+- credentials, private evaluation answers or `.research/` content in public files;
+- missing tests at a user, persistence or untrusted-input boundary;
+- docs claiming real-instrument, physical-safety or scientific validity beyond the tests.
+
+Skip style that ruff enforces.

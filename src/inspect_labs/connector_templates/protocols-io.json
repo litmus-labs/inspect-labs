@@ -1,0 +1,50 @@
+{
+  "connector": "protocols-io",
+  "server": {
+    "command": "protocols-io-mcp-server",
+    "env": [
+      "PROTOCOLS_IO_ACCESS_TOKEN"
+    ]
+  },
+  "source": "https://github.com/hqn21/protocols-io-mcp-server",
+  "confirmed": "repository source, 2026-10-04",
+  "notes": "MIT. Needs an access token, passed by name only. The command name depends on how the server is installed.",
+  "tools": {
+    "search_public_protocols": {
+      "action": "read"
+    },
+    "get_protocol": {
+      "action": "read"
+    },
+    "get_protocol_steps": {
+      "action": "read"
+    },
+    "get_my_protocols": {
+      "action": "read"
+    },
+    "create_protocol": {
+      "action": "reversible",
+      "note": "Creates a protocol in the account"
+    },
+    "update_protocol_title": {
+      "action": "reversible",
+      "note": "Edits a protocol"
+    },
+    "update_protocol_description": {
+      "action": "reversible",
+      "note": "Edits a protocol"
+    },
+    "add_protocol_step": {
+      "action": "reversible",
+      "note": "Edits a protocol"
+    },
+    "set_protocol_steps": {
+      "action": "irreversible",
+      "note": "Replaces every step"
+    },
+    "delete_protocol_step": {
+      "action": "irreversible",
+      "note": "Deletes a step"
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "connector": "10x-genomics",
+  "server": {
+    "command": "txg-mcp",
+    "env": [
+      "TXG_ACCESS_TOKEN"
+    ]
+  },
+  "source": "https://github.com/10XGenomics/txg-mcp",
+  "confirmed": "repository source, 2026-10-04",
+  "notes": "MIT. Needs an access token. Read tools named list_* and get_* are not all listed here; snapshot shows them unclassified for review. The command and token variable names depend on installation. Anthropic's life-sciences manifest installs it as a desktop extension bundle (txg-node.mcpb).",
+  "tools": {
+    "verify_auth": {
+      "action": "read"
+    },
+    "get_tool_version": {
+      "action": "read"
+    },
+    "upload_fastqs": {
+      "action": "external",
+      "note": "Sends local sequencing data to the 10x cloud"
+    },
+    "upload_project_file": {
+      "action": "external",
+      "note": "Sends a local file to the 10x cloud"
+    },
+    "upload_reference": {
+      "action": "external",
+      "note": "Sends a reference to the 10x cloud"
+    },
+    "create_cellranger_count_analysis": {
+      "action": "irreversible",
+      "note": "Starts cloud compute that may cost money"
+    },
+    "create_cellranger_multi_analysis": {
+      "action": "irreversible",
+      "note": "Starts cloud compute that may cost money"
+    },
+    "create_cellranger_aggr_analysis": {
+      "action": "irreversible",
+      "note": "Starts cloud compute that may cost money"
+    },
+    "create_project": {
+      "action": "reversible"
+    },
+    "update_project": {
+      "action": "reversible"
+    },
+    "update_reference": {
+      "action": "reversible"
+    },
+    "set_library": {
+      "action": "reversible"
+    },
+    "download_analysis_files": {
+      "action": "reversible",
+      "note": "Writes local files"
+    },
+    "download_project_file": {
+      "action": "reversible",
+      "note": "Writes local files"
+    }
+  }
+}
