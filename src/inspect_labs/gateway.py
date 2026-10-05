@@ -30,6 +30,7 @@ from typing import Literal, TypeVar
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, JsonValue
 
 from inspect_labs.actions import Action, ActionRecord, ActionRules, Decision, stricter
+from inspect_labs.journal import Journal
 from inspect_labs.spec import OperationSpec
 
 T = TypeVar("T")
@@ -71,6 +72,7 @@ class Gateway:
         approver: Called for held actions. Without one, held actions are refused.
         records: Where to append action records; a new list when omitted.
         checks: Domain checks run in order after the rules, unless the rules refuse.
+        journal: Where to write each step as it happens, before the next one.
     """
 
     def __init__(
@@ -80,6 +82,7 @@ class Gateway:
         approver: Approver | None = None,
         records: list[ActionRecord] | None = None,
         checks: Sequence[Check] = (),
+        journal: Journal | None = None,
     ) -> None:
         self.operations = operations
         self.rules = rules
@@ -87,10 +90,27 @@ class Gateway:
         self.checks = tuple(checks)
         self.records: list[ActionRecord] = records if records is not None else []
         self.stopped: str | None = None
+        self.journal = journal
+        self.listeners: list[Callable[[ActionRecord], None]] = []
+        """Called with each action record as soon as it is made, for live monitors."""
+        self._requests = 0
 
-    def stop(self, reason: str) -> None:
-        """Refuse every later action. Actions already running are not interrupted."""
-        self.stopped = reason
+    def _write(
+        self,
+        kind: Literal["decided", "approval", "finished", "stopped"],
+        body: dict[str, JsonValue],
+    ) -> None:
+        if self.journal is not None:
+            self.journal.append(kind, body)
+
+    def stop(self, reason: str, *, by: str = "operator") -> None:
+        """Refuse every later action. Actions already running are not interrupted.
+
+        A later stop keeps the first reason.
+        """
+        if self.stopped is None:
+            self.stopped = reason
+            self._write("stopped", {"reason": reason, "by": by})
 
     def decide(self, action: Action) -> Decision:
         """The rules' decision for one action, including a stop, before domain checks."""
@@ -134,17 +154,42 @@ class Gateway:
             ActionRefused: The action was refused or not approved; ``call`` was not run.
         """
         requested_at = datetime.now(UTC).isoformat()
+        self._requests += 1
+        request = self._requests
         action = Action.of(tool, arguments, self.operations)
         decision = await self.decide_with_checks(action)
+        self._write(
+            "decided",
+            {
+                "request": request,
+                "requested_at": requested_at,
+                "action": action.model_dump(mode="json", exclude_defaults=True),
+                "decision": decision.model_dump(mode="json", exclude_defaults=True),
+            },
+        )
         approved: bool | None = None
         approved_by: str | None = None
         if decision.outcome == "hold" and self.approver is not None:
-            granted = self.approver(action)
-            answer = await granted if inspect.isawaitable(granted) else granted
+            try:
+                granted = self.approver(action)
+                answer = await granted if inspect.isawaitable(granted) else granted
+            except Exception:
+                # An approver that fails has not approved: fail closed.
+                logger.warning("Approver failed for %s", action.tool, exc_info=True)
+                answer = Approval(approved=False)
             if isinstance(answer, Approval):
                 approved, approved_by = answer.approved, answer.by if answer.approved else None
             else:
                 approved = answer is True
+            if approved and self.stopped is not None:
+                # Stopped while waiting for approval: the stop wins.
+                approved, approved_by = False, None
+                decision = Decision(outcome="deny", rule="stopped", reason=self.stopped)
+            self._write(
+                "approval",
+                {"request": request, "approved": approved}
+                | ({"by": approved_by} if approved_by else {}),
+            )
         elif decision.outcome == "hold":
             approved = False
 
@@ -160,6 +205,15 @@ class Gateway:
                 status=status,
             )
             self.records.append(entry)
+            self._write(
+                "finished",
+                {"request": request, "sequence": entry.sequence, "status": status},
+            )
+            for listener in self.listeners:
+                try:
+                    listener(entry)
+                except Exception:
+                    logger.warning("Action listener failed", exc_info=True)
             return entry
 
         if decision.outcome == "deny" or (decision.outcome == "hold" and not approved):

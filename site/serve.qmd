@@ -33,6 +33,13 @@ inspect-labs serve --lab liquid-handler \
 | `--approvals` | Actions a person approved in advance, as a JSON list of `{"tool": ..., "arguments": {...}}`. A held action runs only if it matches one exactly. |
 | `--stop-file` | Stop the session when this file appears. Every later action is refused, and the file's text is recorded as the reason. |
 | `--lab-log` | Where to write the session's lab log when the agent disconnects. It is never overwritten. |
+| `--leases` | Time-limited permissions given in advance, as a JSON list of `{name, tool, match, expires_at, uses, granted_by}`. |
+| `--control-socket` | A private local socket operators use to watch, approve and stop the session while it runs. Held actions then wait for an operator. |
+| `--approval-timeout` | Seconds a held action waits for an operator before it is refused (default 300). |
+| `--refusal-limit` | Stop the session after this many refused actions. |
+| `--stop-on` | Stop the session when this live monitor flags. Repeat for several. |
+| `--journal` | Where to write each step as it happens. Defaults to the lab log path with `.journal.jsonl`. |
+| `--witness-file` | Also append each journal digest here. Keep it where the lab can't rewrite it. |
 
 Point any MCP agent at the command. For example, in an MCP client configuration:
 
@@ -49,6 +56,50 @@ Point any MCP agent at the command. For example, in an MCP client configuration:
 
 The agent sees the Lab's tools. A refused action comes back as an error with the
 reason, and never reaches the Lab. The agent cannot stop or reconfigure the gateway.
+
+## Operators in the loop
+
+With `--control-socket`, a held action waits for a person instead of being refused
+at once. Operators answer from another terminal:
+
+```bash
+inspect-labs operator .research/ops/lab.sock pending
+inspect-labs operator .research/ops/lab.sock approve 3f9c1a2b7d4e --by alice
+inspect-labs operator .research/ops/lab.sock stop --by alice --reason "Unexpected plan"
+```
+
+- Every answer records who gave it, and the lab log shows it as `approved_by`.
+- An action nobody answers in time is refused. Nobody answering is not approval.
+- A stop refuses everything still waiting, and wins over an approval that arrives
+  after it.
+- The socket's directory must be private (mode 700), so only the operator's own
+  account can use it. The agent's tools never include it, so an agent can't approve
+  its own actions or lift a stop.
+
+## Tripwires
+
+Monitors also run after every action while the session runs. `--refusal-limit 3`
+stops the session after three refused actions, since an agent repeatedly hitting the
+rules may be probing them. `--stop-on irreversible-without-approval` stops it the
+first time that monitor flags.
+
+## The journal
+
+The lab log is written when the session ends. The journal is written as the session
+happens: each decision before the action reaches the Lab, then any approval, the
+result, stops and flags. Each line is flushed to disk before the gateway continues,
+so a crash loses at most the line being written.
+
+```bash
+inspect-labs journal .research/session.journal.jsonl --witness /mnt/witness/lab.txt
+```
+
+Each entry is hash-chained to the one before it, so changing, removing or reordering
+an entry is detected. Someone with write access could still rebuild the whole file.
+A witness file closes that gap if it lives somewhere they can't rewrite, such as
+another machine or an append-only store: a rebuilt journal no longer matches it.
+Each journal starts with a random id, and witness lines name it, so one witness file
+can serve many sessions. A journal the witness has no record of is reported too.
 
 ## After the session
 
