@@ -40,7 +40,7 @@ Reviews are layered so each catches different problems. All of them check
 |---|---|---|
 | Greptile | Every pull request, automatically | Reads the whole codebase, so it catches changes that break code elsewhere |
 | Claude | Code pull requests when opened; `@claude` to ask again | Checks the review guide's rules line by line |
-| Codex | Comment `@codex review` on higher-risk changes | An independent second opinion from a different model |
+| Codex | `scripts/codex-review-pr.sh PR --post` (Codex CLI), or `/codex:review` in Claude Code, on higher-risk changes | An independent second opinion from a different model |
 | A maintainer | Every pull request | Decides; automated reviews advise |
 
 Higher-risk changes are those touching the gateway, action rules, lab logs and

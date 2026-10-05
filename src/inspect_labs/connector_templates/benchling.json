@@ -1,0 +1,23 @@
+{
+  "connector": "benchling",
+  "server": {
+    "url": null,
+    "per_tenant": true
+  },
+  "source": "https://claude.com/connectors/benchling",
+  "confirmed": "directory listing only, not tools/list; unconfirmed",
+  "notes": "Per-tenant URL with sign-in, which Inspect Labs connectors don't support yet. Tool names unconfirmed.",
+  "tools": {
+    "benchling_agent": {
+      "action": "read",
+      "note": "Hands work to Benchling's own agent; its output is opaque"
+    },
+    "benchling_task_status": {
+      "action": "read"
+    },
+    "benchling_agent_edit_entry": {
+      "action": "irreversible",
+      "note": "Edits notebook entries"
+    }
+  }
+}

@@ -1,0 +1,75 @@
+---
+title: "Connect lab services"
+description: "Put biology databases, notebooks and other MCP connectors behind the gateway, so every call is checked, approved and recorded."
+---
+
+Agents in labs use more than instruments. They search the literature, look up
+compounds and targets, read and write protocols, and could place orders. Many of
+these services are offered as MCP servers, often called connectors. Inspect Labs puts
+a connector behind the same gateway as a Lab, so its calls are checked, approved if
+needed, journaled and recorded like any other lab action.
+
+::: {.callout-warning}
+## Treat results as outside data
+What a connector returns can be wrong, and it can contain text written to mislead
+the agent. The lab log records a digest of every result and its first part, so
+reviewers can see what the agent was shown.
+:::
+
+## Review a connector once
+
+Snapshot the connector's tools into a profile, starting from a built-in template:
+
+```bash
+inspect-labs connector snapshot pubmed \
+  --url https://pubmed.mcp.claude.com/mcp --template pubmed \
+  --output connectors/pubmed.json
+```
+
+The profile pins each tool's description and input schema by digest and gives each
+an action type. Review it before use:
+
+- **Tools without an action type are never offered to the agent.** The snapshot
+  lists them as `unclassified`; give each one a type to offer it.
+- **A changed tool is refused.** If the server later changes a tool's description or
+  schema, calls to it are refused until you snapshot and review it again. A
+  connector can't quietly turn a search into a write.
+- **Sequences are screened before they leave.** List the arguments that carry DNA or
+  protein sequences in `sequence_arguments`. A call carrying a sequence runs only if
+  a configured screen says every sequence is clear; flagged, unknown or unscreened
+  sequences are refused.
+- **Credentials stay out of profiles.** `env` names environment variables to pass to
+  a local server; their values are read when it starts.
+
+## Serve or evaluate
+
+```bash
+inspect-labs serve --connector connectors/pubmed.json --lab-log .research/pubmed-session.json
+```
+
+In an evaluation, use `ConnectorLab(profile, directory)` as the Lab in
+`connect_lab`. The default rules apply as for any Lab: reads run, while irreversible
+and external calls need a person's approval.
+
+## Built-in templates
+
+Templates are reviewed starting points; a snapshot applies them only to tools with
+matching names and leaves the rest unclassified.
+
+| Template | Service | Classified as | Sign-in |
+|---|---|---|---|
+| `pubmed` | PubMed (Anthropic-hosted) | All read | None |
+| `chembl` | ChEMBL | All read | None |
+| `biorxiv` | bioRxiv preprints | All read | None |
+| `clinical-trials` | ClinicalTrials.gov | All read | None |
+| `open-targets` | Open Targets | All read | None |
+| `protocols-io` | protocols.io | Reads; edits reversible; replacing or deleting steps irreversible | Token |
+| `10x-genomics` | 10x Genomics Cloud | Uploads external; starting analyses irreversible | Token |
+| `synapse` | Synapse | Proxy tools hide the real tool, so every call is held | Sign-in |
+| `benchling` | Benchling | Notebook edits irreversible; names unconfirmed | Sign-in |
+| `biorender` | BioRender | Figure creation reversible; names unconfirmed | Sign-in |
+
+The first five were checked against each server's live tool list on 4 October 2026.
+Connectors that need an interactive sign-in (OAuth) aren't supported yet. No DNA
+synthesis provider offers an MCP connector yet; an ordering tool should be
+classified `external`, with its sequence arguments screened.

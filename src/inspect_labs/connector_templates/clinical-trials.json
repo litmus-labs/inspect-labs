@@ -1,0 +1,29 @@
+{
+  "connector": "clinical-trials",
+  "server": {
+    "url": "https://hcls.mcp.claude.com/clinical_trials/mcp"
+  },
+  "source": "https://github.com/anthropics/life-sciences",
+  "confirmed": "tools/list, 2026-10-04",
+  "notes": "No sign-in.",
+  "tools": {
+    "search_trials": {
+      "action": "read"
+    },
+    "get_trial_details": {
+      "action": "read"
+    },
+    "search_by_sponsor": {
+      "action": "read"
+    },
+    "search_investigators": {
+      "action": "read"
+    },
+    "analyze_endpoints": {
+      "action": "read"
+    },
+    "search_by_eligibility": {
+      "action": "read"
+    }
+  }
+}

@@ -55,6 +55,7 @@ website:
         - section: "Using Labs with agents"
           contents:
             - serve.qmd
+            - connectors.qmd
     - id: labs
       title: "Labs"
       contents:

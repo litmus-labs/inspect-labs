@@ -1,0 +1,32 @@
+{
+  "connector": "biorxiv",
+  "server": {
+    "url": "https://hcls.mcp.claude.com/biorxiv/mcp"
+  },
+  "source": "https://github.com/anthropics/life-sciences",
+  "confirmed": "tools/list, 2026-10-04",
+  "notes": "Preprints are not peer reviewed. No sign-in.",
+  "tools": {
+    "search_preprints": {
+      "action": "read"
+    },
+    "get_preprint": {
+      "action": "read"
+    },
+    "get_categories": {
+      "action": "read"
+    },
+    "search_published_preprints": {
+      "action": "read"
+    },
+    "search_by_funder": {
+      "action": "read"
+    },
+    "get_content_statistics": {
+      "action": "read"
+    },
+    "get_usage_statistics": {
+      "action": "read"
+    }
+  }
+}

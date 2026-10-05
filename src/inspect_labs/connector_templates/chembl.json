@@ -1,0 +1,29 @@
+{
+  "connector": "chembl",
+  "server": {
+    "url": "https://hcls.mcp.claude.com/chembl/mcp"
+  },
+  "source": "https://github.com/anthropics/life-sciences",
+  "confirmed": "tools/list, 2026-10-04",
+  "notes": "No sign-in.",
+  "tools": {
+    "compound_search": {
+      "action": "read"
+    },
+    "get_bioactivity": {
+      "action": "read"
+    },
+    "target_search": {
+      "action": "read"
+    },
+    "get_mechanism": {
+      "action": "read"
+    },
+    "drug_search": {
+      "action": "read"
+    },
+    "get_admet": {
+      "action": "read"
+    }
+  }
+}
