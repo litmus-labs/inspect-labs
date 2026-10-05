@@ -25,7 +25,11 @@ GUIDANCE = "Remove this guidance before submitting"
 COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 # Lines that aren't prose: images, links on their own, code fences and their contents.
 NOT_PROSE = re.compile(r"^\s*(!\[|<img|https?://\S+$)")
+# Fenced code with backticks or tildes; an unclosed fence runs to the end.
+FENCE = re.compile(r"^\s{0,3}(`{3,}|~{3,}).*?(^\s{0,3}\1[^\S\n]*$|\Z)", re.DOTALL | re.MULTILINE)
 HEADING = re.compile(r"^\s{0,3}#{1,6}\s")
+# A Setext heading: a text line underlined with = or -.
+SETEXT = re.compile(r"^[^\n]*\S[^\n]*\n\s{0,3}(=+|-+)\s*$", re.MULTILINE)
 # Blocks that aren't prose paragraphs: lists, quotes, tables and headings.
 BLOCK = re.compile(r"^\s{0,3}([-*+]\s|\d+[.)]\s|>|\||#{1,6}\s)")
 
@@ -33,7 +37,13 @@ BLOCK = re.compile(r"^\s{0,3}([-*+]\s|\d+[.)]\s|>|\||#{1,6}\s)")
 def prose(body: str) -> str:
     """The description without comments, code blocks, images and bare links."""
     text = COMMENT.sub("", body)
-    text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+    # Fenced code with backticks or tildes; an unclosed fence runs to the end.
+    text = re.sub(
+        r"^\s{0,3}(`{3,}|~{3,}).*?(^\s{0,3}\1[^\S\n]*$|\Z)",
+        "",
+        text,
+        flags=re.DOTALL | re.MULTILINE,
+    )
     return "\n".join(line for line in text.splitlines() if not NOT_PROSE.match(line)).strip()
 
 
@@ -48,10 +58,10 @@ def problems(title: str, body: str) -> list[str]:
     if GUIDANCE in (body or ""):
         issues.append("description still contains the template's guidance comment")
     text = prose(body or "")
-    if any(HEADING.match(line) for line in text.splitlines()):
+    if any(HEADING.match(line) for line in text.splitlines()) or SETEXT.search(text):
         issues.append("description has headings; write plain paragraphs instead")
     blocks = [block.strip() for block in re.split(r"\n\s*\n", text) if block.strip()]
-    paragraphs = [block for block in blocks if not BLOCK.match(block)]
+    paragraphs = [block for block in blocks if not BLOCK.match(block) and not SETEXT.search(block)]
     if len(paragraphs) < 2:
         issues.append(
             "description needs at least two prose paragraphs (lists, quotes and tables don't"

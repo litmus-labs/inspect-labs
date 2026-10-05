@@ -84,3 +84,19 @@ def test_a_list_alongside_two_paragraphs_is_fine():
 def test_headings_inside_code_blocks_dont_count():
     body = BODY + "\n```markdown\n## Example heading\n```\n"
     assert check.problems(TITLE, body) == []
+
+
+def test_setext_headings_are_headings():
+    issues = check.problems(TITLE, "Problem and outcome\n===\n\nChanges and approach.\n")
+    assert any("headings" in issue for issue in issues)
+    assert any("two prose paragraphs" in issue for issue in issues)
+    underlined = "One paragraph.\n\nA heading\n---\n"
+    assert any("headings" in issue for issue in check.problems(TITLE, underlined))
+
+
+def test_tilde_fences_and_unclosed_fences_are_not_prose():
+    tilde = "One paragraph about the change.\n\n~~~text\nScope and approach.\n~~~\n"
+    assert any("two prose paragraphs" in i for i in check.problems(TITLE, tilde))
+    unclosed = "One paragraph about the change.\n\n```\nScope and approach.\n"
+    assert any("two prose paragraphs" in i for i in check.problems(TITLE, unclosed))
+    assert check.problems(TITLE, BODY + "\n~~~\ncode\n~~~\n") == []
