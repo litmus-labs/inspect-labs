@@ -11,7 +11,7 @@ license = "MIT"
 license-files = ["LICENSE", "src/inspect_labs/THIRD_PARTY_NOTICES.md"]
 requires-python = ">=3.12"
 dependencies = [
-    "inspect-ai==0.3.249",
+    "inspect-ai==0.3.273",
     "pydantic>=2.12,<3",
     "anyio>=4,<5",
     # Inspect 0.3.249's control server imports fastapi.dependencies.utils.get_flat_dependant,
