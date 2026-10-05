@@ -1,7 +1,13 @@
 {
   "include": [
     "tests/**/*.py",
-    "plugins/*/tests/**/*.py"
+    "plugins/*/tests/**/*.py",
+    "*.md",
+    "docs/**/*.md",
+    ".github/**/*.md",
+    "plugins/*/README.md",
+    "site/**/*.md",
+    "site/**/*.qmd"
   ],
   "exclude": [
     "site/_site/**",
