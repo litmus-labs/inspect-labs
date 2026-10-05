@@ -116,19 +116,27 @@ the agent would have done next, since the agent saw the original decisions.
 ## Release records in tiers
 
 Auditors, partners and the public need different views of the same run. A release
-policy gives each field of a lab log a tier, such as `public`, `auditor` or
-`restricted`. Releasing at a tier keeps the fields at or below it. Each field above
+policy gives each field of a lab log a tier. The default tiers are named for who
+may read them, like managed-access schemes for sensitive biological data:
+
+| Tier | Who reads it |
+|---|---|
+| `public` | Anyone |
+| `vetted` | Identity-checked reviewers under an agreement: auditors, third-party evaluators, regulators |
+| `restricted` | Named people, for hazardous detail. Others see only that it exists. |
+
+ Releasing at a tier keeps the fields at or below it. Each field above
 it is replaced by its tier and a keyed digest of its value.
 
 ```json
 {
   "version": "1",
-  "tiers": ["public", "auditor", "restricted"],
+  "tiers": ["public", "vetted", "restricted"],
   "default_tier": "restricted",
   "rules": [
     {"path": "samples.*.actions.*.action.tool", "tier": "public"},
-    {"path": "samples.*.actions.*.action.arguments", "tier": "auditor"},
-    {"path": "samples.*.payload", "tier": "auditor"}
+    {"path": "samples.*.actions.*.action.arguments", "tier": "vetted"},
+    {"path": "samples.*.payload", "tier": "vetted"}
   ]
 }
 ```
@@ -155,7 +163,9 @@ the key with the full lab log, and share it only with readers allowed to see
 everything. Each release gets a new key, so withheld values can't be guessed from
 their digests or linked across releases.
 
-For bio, use BioTIER's content sets to decide tiers rather than inventing your own.
+The tiers decide who reads a field; a domain's own guidance decides which fields are
+sensitive. For bio, a content classification such as SecureBio's BioTIER can help
+decide which fields belong in `restricted`.
 
 ## Keep records private
 

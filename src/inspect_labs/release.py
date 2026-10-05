@@ -1,8 +1,17 @@
 """Release a lab log in tiers: each reader sees what their tier allows, and can
 check that what they see came from the original record.
 
-A release policy gives each field of a lab log file a tier, such as ``public``,
-``auditor`` or ``restricted``. Releasing at a tier keeps fields at or below it and
+A release policy gives each field of a lab log file a tier. The default tiers are
+named for who may read them, the way managed-access schemes for sensitive
+biological data work:
+
+- ``public``: anyone.
+- ``vetted``: identity-checked reviewers under an agreement, such as auditors,
+  third-party evaluators and regulators.
+- ``restricted``: named people for hazardous detail; others see only that it
+  exists and its commitment.
+
+Releasing at a tier keeps fields at or below it and
 replaces each field above it with a commitment: its tier and a keyed digest of its
 value. The digest is keyed with a release key, written to a separate private file,
 so a short value such as "yes" can't be guessed from its digest.
@@ -68,7 +77,7 @@ class ReleasePolicy(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
     version: str = Field(min_length=1)
-    tiers: tuple[str, ...] = ("public", "auditor", "restricted")
+    tiers: tuple[str, ...] = ("public", "vetted", "restricted")
     rules: tuple[FieldRule, ...] = ()
     default_tier: str = "restricted"
 

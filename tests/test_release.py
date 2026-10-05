@@ -32,8 +32,8 @@ POLICY = ReleasePolicy(
     version="test-1",
     rules=(
         FieldRule(path="samples.*.actions.*.action.tool", tier="public"),
-        FieldRule(path="samples.*.payload", tier="auditor"),
-        FieldRule(path="samples.*.actions.*.action.arguments", tier="auditor"),
+        FieldRule(path="samples.*.payload", tier="vetted"),
+        FieldRule(path="samples.*.actions.*.action.arguments", tier="vetted"),
         FieldRule(path="lab", tier="public"),
     ),
 )
@@ -65,14 +65,14 @@ def test_the_public_tier_sees_what_happened_but_not_the_details(lab_log, tmp_pat
     assert [a["status"] for a in record["actions"]] == ["ran", "refused"]
     assert record["chain_sha256"] == sample(json.loads(lab_log.read_text()))["chain_sha256"]
     assert set(record["payload"]) == {"withheld", "sha256"}
-    assert record["payload"]["withheld"] == "auditor"
-    assert record["actions"][0]["action"]["arguments"]["withheld"] == "auditor"
+    assert record["payload"]["withheld"] == "vetted"
+    assert record["actions"][0]["action"]["arguments"]["withheld"] == "vetted"
     # Unclassified fields are withheld at the default (most restrictive) tier.
     assert record["collected_at"]["withheld"] == "restricted"
 
 
-def test_the_auditor_tier_sees_more(lab_log, tmp_path):
-    release = release_lab_log(lab_log, POLICY, "auditor", tmp_path / "audit.json", tmp_path / "k")
+def test_the_vetted_tier_sees_more(lab_log, tmp_path):
+    release = release_lab_log(lab_log, POLICY, "vetted", tmp_path / "audit.json", tmp_path / "k")
     record = sample(release.document)
     assert "withheld" not in record["payload"]
     assert record["actions"][1]["action"]["arguments"]["well"] == "A1"
