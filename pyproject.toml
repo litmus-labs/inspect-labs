@@ -16,7 +16,7 @@ dependencies = [
     "anyio>=4,<5",
     # Inspect 0.3.249's control server imports fastapi.dependencies.utils.get_flat_dependant,
     # which FastAPI removed in 0.140.7; newer releases silently disable `inspect ctl`.
-    "fastapi<0.140.7",
+    "fastapi<0.142.3",
 ]
 
 [project.urls]
