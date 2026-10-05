@@ -28,7 +28,7 @@
       "merge_system_rule": true
     },
     {
-      "path": "src/inspect_labs/{journal,release,evidence,monitors,cli}.py",
+      "path": "src/inspect_labs/{journal,release,evidence,monitors,cli,tasks,liquid_tasks}.py",
       "rule": "Evidence integrity. An unknown outcome must stay unknown (null), never pass, fail or zero. Rescoring, replay, monitor, attach, release and verify must never dispatch an action or call a Lab. Digests must stay the same for old files and across processes, and must not verify a changed record. Withheld release fields must not leak. Files are written privately (mode 600) and never overwritten. Also check security: secrets or credentials, personal data, command or path injection, unsafe deserialization, permissions broader than needed, and private evaluation answers or .research content in public files.",
       "merge_system_rule": true
     },
@@ -48,8 +48,8 @@
       "merge_system_rule": true
     },
     {
-      "path": "src/inspect_labs/{liquid_handling,robot_bridge}.py",
-      "rule": "Instrument and partner adapters. Simulated results must never be presented as real-instrument or physical-safety evidence. Ground truth must stay out of what the agent sees. No partner code may be copied; partner projects are imported from pinned checkouts and instrument libraries used through their public APIs. Docs and READMEs must not claim real-instrument, physical-safety or scientific validity beyond what the tests show. Also check security: secrets or credentials, personal data, command or path injection, unsafe deserialization, permissions broader than needed, and private evaluation answers or .research content in public files.",
+      "path": "src/inspect_labs/{liquid_handling,liquid,robot_bridge,robot_workflow,robot_mock,environments,devices,litmus_labs,native,conformance,secure_lab,spec}.py",
+      "rule": "Lab implementations and instrument adapters. Agent tools must only reach a Lab through the gateway, a refused or undeclared action must never dispatch, and capability checks must run before any tool is offered. Simulated results must never be presented as real-instrument or physical-safety evidence. Ground truth must stay out of what the agent sees. No partner code may be copied; partner projects are imported from pinned checkouts and instrument libraries used through their public APIs. Docs and READMEs must not claim real-instrument, physical-safety or scientific validity beyond what the tests show. Also check security: secrets or credentials, personal data, command or path injection, unsafe deserialization, permissions broader than needed, and private evaluation answers or .research content in public files.",
       "merge_system_rule": true
     },
     {
