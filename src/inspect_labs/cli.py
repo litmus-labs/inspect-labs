@@ -25,6 +25,8 @@ from inspect_labs.bindings import (
     LabLogFile,
     attach_late_result,
     monitor_saved_run,
+    read_lab_logs,
+    read_session_log,
     replay_rules,
     rescore,
 )
@@ -43,6 +45,7 @@ from inspect_labs.liquid_tasks import serial_dilution_outcome, worklist_outcome
 from inspect_labs.monitors import DEFAULT_MONITORS, LIVE_MONITORS, repeated_refusals
 from inspect_labs.operators import ApprovalQueue, ControlRequest, send_control
 from inspect_labs.plugins import Kind, available, canonical, resolve
+from inspect_labs.release import ReleasePolicy, release_lab_log, verify_release
 from inspect_labs.serve import LabSession, serve_over_stdio
 from inspect_labs.tasks import (
     handoff,
@@ -213,6 +216,20 @@ def main() -> None:
     )
     journal.add_argument("path", type=Path, help="The session's .journal.jsonl")
     journal.add_argument("--witness", type=Path, help="A witness file to compare with")
+    release = commands.add_parser(
+        "release", help="Write a lab log released at one tier, with its key in a private file"
+    )
+    release.add_argument("lab_log", type=Path, help="A .labs file or a session lab log")
+    release.add_argument("--policy", type=Path, required=True, help="Release policy as JSON")
+    release.add_argument("--tier", required=True, help="The tier to release at")
+    release.add_argument("--output", type=Path, required=True, help="The release to write")
+    release.add_argument("--key", type=Path, required=True, help="Where to write the key")
+    verify = commands.add_parser(
+        "verify-release", help="Check a release against the full lab log it came from"
+    )
+    verify.add_argument("release_file", type=Path, help="The release")
+    verify.add_argument("--lab-log", type=Path, required=True, help="The full lab log")
+    verify.add_argument("--key", type=Path, required=True, help="The release's key")
     monitor = commands.add_parser(
         "monitor", help="Run the default monitors on a saved run and list their flags"
     )
@@ -290,6 +307,40 @@ def main() -> None:
                     ),
                     file=stdout,
                 )
+                if problems:
+                    sys.exit(1)
+                return
+            if args.command == "release":
+                try:
+                    policy = ReleasePolicy.model_validate_json(args.policy.read_text())
+                    released = release_lab_log(
+                        args.lab_log, policy, args.tier, args.output, args.key
+                    )
+                except (ValueError, OSError) as exc:
+                    parser.error(f"Cannot release: {type(exc).__name__}: {exc}")
+                print(
+                    json.dumps(
+                        {
+                            "release": str(args.output),
+                            "tier": released.tier,
+                            "key": str(args.key),
+                            "source_sha256": released.source_sha256,
+                        }
+                    ),
+                    file=stdout,
+                )
+                return
+            if args.command == "verify-release":
+                try:
+                    problems = verify_release(args.release_file, args.lab_log, args.key)
+                    # The full lab log must also match its own hash chains.
+                    if json.loads(args.lab_log.read_text()).get("kind") == "session":
+                        read_session_log(args.lab_log)
+                    else:
+                        read_lab_logs(args.lab_log)
+                except (ValueError, OSError) as exc:
+                    parser.error(f"Cannot verify: {type(exc).__name__}: {exc}")
+                print(json.dumps({"faithful": not problems, "problems": problems}), file=stdout)
                 if problems:
                     sys.exit(1)
                 return

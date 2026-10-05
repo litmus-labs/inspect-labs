@@ -113,6 +113,50 @@ recorded and replayed decision and counts the changes. A lab log that fails its
 hash check is refused. Replay shows what the new rules would have decided, not what
 the agent would have done next, since the agent saw the original decisions.
 
+## Release records in tiers
+
+Auditors, partners and the public need different views of the same run. A release
+policy gives each field of a lab log a tier, such as `public`, `auditor` or
+`restricted`. Releasing at a tier keeps the fields at or below it. Each field above
+it is replaced by its tier and a keyed digest of its value.
+
+```json
+{
+  "version": "1",
+  "tiers": ["public", "auditor", "restricted"],
+  "default_tier": "restricted",
+  "rules": [
+    {"path": "samples.*.actions.*.action.tool", "tier": "public"},
+    {"path": "samples.*.actions.*.action.arguments", "tier": "auditor"},
+    {"path": "samples.*.payload", "tier": "auditor"}
+  ]
+}
+```
+
+```bash
+inspect-labs release run.labs --policy policy.json --tier public \
+  --output public.json --key public.key
+inspect-labs verify-release public.json --lab-log run.labs --key public.key
+```
+
+- **Fields nobody classified get the default tier.** Make the default the most
+  restricted tier, so forgotten fields are withheld.
+- **Every tier sees what happened.** Each action's sequence, decision and status,
+  and each sample's hash-chain digest, are always kept.
+- **A rule covers a field and everything under it.** A longer, more specific path
+  overrides it further down.
+- **Partly withheld sections still show their shape.** Field names and list lengths
+  inside a section where some fields are kept stay visible.
+
+Someone with the full lab log and the key can check that a release is a faithful
+cut: every kept field matches, and every withheld field's digest matches the
+original. The full lab log's hash chains show it wasn't changed after the run. Keep
+the key with the full lab log, and share it only with readers allowed to see
+everything. Each release gets a new key, so withheld values can't be guessed from
+their digests or linked across releases.
+
+For bio, use BioTIER's content sets to decide tiers rather than inventing your own.
+
 ## Keep records private
 
 Use restrictive directory permissions and keep raw records outside public datasets
