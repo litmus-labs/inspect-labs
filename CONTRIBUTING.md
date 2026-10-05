@@ -49,11 +49,13 @@ push fixes, resolve each review conversation or reply with why it doesn't apply.
 
 For a local review before you push, [Open Code Review](https://github.com/alibaba/open-code-review)
 selects the changed files and applies this project's rules in
-`.opencodereview/rule.json`. In Claude Code (or another coding agent) its delegation
-mode runs the review with your agent's own subscription, so no API key is needed:
-install the `ocr` CLI (`npm install -g @alibaba-group/open-code-review`) and the
-`open-code-review` plugin, then run `/open-code-review:delegate-review`. Check which
-rule applies to a file with `ocr rules check PATH`.
+`.opencodereview/rule.json`. Its delegation mode runs the review with your coding
+agent's own subscription, so no API key is needed. Install the `ocr` CLI
+(`npm install -g @alibaba-group/open-code-review`). In Claude Code, install the
+`open-code-review` plugin and run `/open-code-review:delegate-review`. For Codex,
+Cursor and other agents, follow OCR's
+[integration instructions](https://github.com/alibaba/open-code-review/blob/main/plugins/open-code-review/README.md).
+Check which rule applies to a file with `ocr rules check PATH`.
 
 ## Docs and website
 
