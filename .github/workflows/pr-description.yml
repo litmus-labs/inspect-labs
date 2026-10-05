@@ -1,9 +1,13 @@
 name: PR description
 
-# Checks that the pull request description fills in the template's What this does,
-# Why and Verification sections. Reruns when the description is edited.
+# Checks a pull request's title and description against the pull request template.
+#
+# pull_request_target runs this workflow file and the checker from the base branch,
+# so a pull request can't change its own check. It is safe here because the job never
+# checks out or runs the pull request's code: it only reads the title and description
+# from the event file, with read-only permissions and no secrets.
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, edited, synchronize, reopened]
 
 permissions:
@@ -19,21 +23,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      # Use the base branch's checker, so a pull request can't change its own check.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
           sparse-checkout: scripts/check-pr-description.py
           sparse-checkout-cone-mode: false
-      # Only the pull request that first adds the checker uses its own copy.
-      - name: Use this pull request's checker if the base has none
-        if: hashFiles('scripts/check-pr-description.py') == ''
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          sparse-checkout: scripts/check-pr-description.py
-          sparse-checkout-cone-mode: false
-      # The description is read from the event file, never interpolated into the script.
-      - name: Check the description
+      - name: Check the title and description
         run: python3 scripts/check-pr-description.py
