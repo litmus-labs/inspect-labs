@@ -100,3 +100,12 @@ def test_tilde_fences_and_unclosed_fences_are_not_prose():
     unclosed = "One paragraph about the change.\n\n```\nScope and approach.\n"
     assert any("two prose paragraphs" in i for i in check.problems(TITLE, unclosed))
     assert check.problems(TITLE, BODY + "\n~~~\ncode\n~~~\n") == []
+
+
+def test_text_a_bot_inserted_is_ignored():
+    summary = (
+        "\n<!-- This is an auto-generated comment: release notes by coderabbit.ai -->\n\n"
+        "## Summary by CodeRabbit\n\n- **New Features**\n  - Added scans.\n\n"
+        "<!-- end of auto-generated comment: release notes by coderabbit.ai -->\n"
+    )
+    assert check.problems(TITLE, BODY + summary) == []
