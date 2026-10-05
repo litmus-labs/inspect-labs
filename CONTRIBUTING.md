@@ -50,9 +50,8 @@ Security checks run on every pull request too. CodeQL scans the Python code and 
 GitHub Actions workflows (also weekly), dependency review blocks new dependencies
 with known high-severity vulnerabilities, and GitHub push protection blocks pushes
 containing secrets that match its supported patterns (a contributor can bypass a
-block where the repository allows it, with a reason). Findings from uploaded scans
-appear under the repository's Security tab; CodeQL results from fork and Dependabot
-pull requests aren't uploaded, since their tokens are read-only.
+block where the repository allows it, with a reason). Findings appear under the
+repository's Security tab, including for pull requests from forks and Dependabot.
 
 Reviews are layered so each catches different problems. All of them check
 [the review guide](.github/REVIEW_GUIDE.md).
