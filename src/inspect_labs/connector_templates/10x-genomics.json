@@ -8,7 +8,7 @@
   },
   "source": "https://github.com/10XGenomics/txg-mcp",
   "confirmed": "repository source, 2026-10-04",
-  "notes": "MIT. Needs an access token. Read tools named list_* and get_* are not all listed here; snapshot shows them unclassified for review. The command and token variable names depend on installation.",
+  "notes": "MIT. Needs an access token. Read tools named list_* and get_* are not all listed here; snapshot shows them unclassified for review. The command and token variable names depend on installation. Anthropic's life-sciences manifest installs it as a desktop extension bundle (txg-node.mcpb).",
   "tools": {
     "verify_auth": {
       "action": "read"

@@ -358,12 +358,18 @@ def main() -> None:
                 except (LookupError, ValueError, OSError) as exc:
                     parser.error(f"Cannot snapshot: {type(exc).__name__}: {exc}")
                 unclassified = sorted(n for n, t in profile.tools.items() if t.action is None)
+                disagreements = sorted(
+                    n
+                    for n, t in profile.tools.items()
+                    if t.server_hints and t.server_hints.disagrees_with(t.action)
+                )
                 print(
                     json.dumps(
                         {
                             "profile": str(args.output),
                             "tools": len(profile.tools),
                             "unclassified": unclassified,
+                            "server_hints_disagree": disagreements,
                         },
                         indent=2,
                     ),

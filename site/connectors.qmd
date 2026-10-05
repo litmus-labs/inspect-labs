@@ -31,13 +31,20 @@ an action type. Review it before use:
 
 - **Tools without an action type are never offered to the agent.** The snapshot
   lists them as `unclassified`; give each one a type to offer it.
-- **A changed tool is refused.** If the server later changes a tool's description or
-  schema, calls to it are refused until you snapshot and review it again. A
+- **A changed tool is refused.** Before every call, on the same connection as the
+  call, the tool's definition is checked against the profile. If the server changed
+  its description or schema, the call is refused until you snapshot and review it
+  again. A
   connector can't quietly turn a search into a write.
 - **Sequences are screened before they leave.** List the arguments that carry DNA or
   protein sequences in `sequence_arguments`. A call carrying a sequence runs only if
   a configured screen says every sequence is clear; flagged, unknown or unscreened
   sequences are refused.
+- **Server hints are shown, never trusted.** A server can label its own tools as
+  read-only or destructive. The profile keeps those labels for reviewers, and the
+  snapshot lists any tool classified as a read that its server says writes. The
+  gateway decides by your classification alone, since a server's labels are its own
+  claims.
 - **Credentials stay out of profiles.** `env` names environment variables to pass to
   a local server; their values are read when it starts.
 
@@ -66,10 +73,26 @@ matching names and leaves the rest unclassified.
 | `protocols-io` | protocols.io | Reads; edits reversible; replacing or deleting steps irreversible | Token |
 | `10x-genomics` | 10x Genomics Cloud | Uploads external; starting analyses irreversible | Token |
 | `synapse` | Synapse | Proxy tools hide the real tool, so every call is held | Sign-in |
-| `benchling` | Benchling | Notebook edits irreversible; names unconfirmed | Sign-in |
+| `benchling` | Benchling | Notebook edits and its delegating agent tool irreversible; names unconfirmed | Sign-in |
 | `biorender` | BioRender | Figure creation reversible; names unconfirmed | Sign-in |
 
-The first five were checked against each server's live tool list on 4 October 2026.
-Connectors that need an interactive sign-in (OAuth) aren't supported yet. No DNA
+## Checked against Claude's life-sciences connectors
+
+On 4 October 2026 the templates were compared with the connectors in Anthropic's
+[life-sciences plugins](https://github.com/anthropics/life-sciences) and with each
+server's live tool list. The comparison listed tools only; no tool was called.
+
+- **PubMed, bioRxiv, ChEMBL, ClinicalTrials and Open Targets** answered without
+  sign-in. Their live tools match the templates exactly, and each server's own
+  read-only labels agree with the templates.
+- **bioRxiv, ChEMBL and ClinicalTrials** are listed in the plugins at
+  `mcp.deepsense.ai`, which refused anonymous requests. The templates use the
+  Anthropic-hosted addresses at `hcls.mcp.claude.com`, which answered.
+- **BioRender, Synapse, Consensus, AdisInsight, Cortellis, Medidata, Owkin and Wiley
+  Scholar Gateway** need an OAuth sign-in, which Inspect Labs connectors don't
+  support yet. Their tools couldn't be listed; only BioRender and Synapse have
+  templates, built from directory listings and source code.
+- **10x Genomics and ToolUniverse** ship as desktop extension bundles that run
+  locally. No DNA
 synthesis provider offers an MCP connector yet; an ordering tool should be
 classified `external`, with its sequence arguments screened.

@@ -70,6 +70,19 @@ class ConnectorServer(BaseModel):
         return self
 
 
+class ServerHints(BaseModel):
+    """A server's own annotations for a tool (MCP tool annotations)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    read_only: bool | None = None
+    destructive: bool | None = None
+    open_world: bool | None = None
+
+    def disagrees_with(self, action: ActionType | None) -> bool:
+        """Whether the server's hints contradict a classification as ``read``."""
+        return action == "read" and (self.read_only is False or self.destructive is True)
+
+
 class ConnectorTool(BaseModel):
     """One connector tool, pinned and classified."""
 
@@ -84,6 +97,9 @@ class ConnectorTool(BaseModel):
     sequence_arguments: tuple[str, ...] = ()
     """Arguments that carry DNA or protein sequences, screened before the call."""
     note: str = ""
+    server_hints: ServerHints | None = None
+    """What the server says about the tool, for reviewers. Never trusted: a server's
+    hints are its own claims, so the gateway decides by ``action`` alone."""
 
 
 class ConnectorProfile(BaseModel):
@@ -153,9 +169,28 @@ def _client(server: ConnectorServer) -> Any:
 
 
 async def _list_tools(server: ConnectorServer) -> dict[str, tuple[str, dict[str, Any]]]:
+    return {name: (d, s) for name, (d, s, _) in (await _list_tools_with_hints(server)).items()}
+
+
+async def _list_tools_with_hints(
+    server: ConnectorServer,
+) -> dict[str, tuple[str, dict[str, Any], ServerHints | None]]:
     async with _client(server) as client:
         listed = await client.list_tools()
-    return {tool.name: (tool.description or "", dict(tool.input_schema)) for tool in listed.tools}
+    tools = {}
+    for tool in listed.tools:
+        notes = tool.annotations
+        hints = (
+            ServerHints(
+                read_only=getattr(notes, "read_only_hint", None),
+                destructive=getattr(notes, "destructive_hint", None),
+                open_world=getattr(notes, "open_world_hint", None),
+            )
+            if notes is not None
+            else None
+        )
+        tools[tool.name] = (tool.description or "", dict(tool.input_schema), hints)
+    return tools
 
 
 async def snapshot_connector(
@@ -168,11 +203,13 @@ async def snapshot_connector(
     """List a connector's tools and pin them, ready for a person to review.
 
     Tools named in ``template`` get its classification; every other tool is left
-    unclassified, so it is not offered until someone classifies it.
+    unclassified, so it is not offered until someone classifies it. The server's own
+    hints are kept for reviewers but never decide anything.
     """
     template = template or {}
     tools = {}
-    for tool_name, (description, schema) in sorted((await _list_tools(server)).items()):
+    listed = await _list_tools_with_hints(server)
+    for tool_name, (description, schema, hints) in sorted(listed.items()):
         known = template.get(tool_name)
         tools[tool_name] = ConnectorTool(
             description=description,
@@ -181,6 +218,7 @@ async def snapshot_connector(
             action=known.action if known else None,
             sequence_arguments=known.sequence_arguments if known else (),
             note=known.note if known else "",
+            server_hints=hints,
         )
     return ConnectorProfile(name=name, version=version, server=server, tools=tools)
 
@@ -241,6 +279,35 @@ def _signature(schema: Mapping[str, Any]) -> inspect.Signature:
     return inspect.Signature(parameters, return_annotation=str)
 
 
+def _definition_problem(
+    name: str, tool: ConnectorTool, listed: Mapping[str, tuple[str, dict[str, Any]]]
+) -> Decision | None:
+    """A refusal if the connector no longer offers ``name`` as it was reviewed."""
+    if name not in listed:
+        reason = f"{name} is no longer offered by the connector"
+    elif definition_digest(name, *listed[name]) != tool.definition_sha256:
+        reason = f"{name} changed since it was reviewed; review the connector again"
+    else:
+        return None
+    return Decision(outcome="deny", rule="connector:definition-changed", reason=reason)
+
+
+def _result_text(result: Any) -> str:
+    """All of a tool result as text: text blocks as they are, anything else (images,
+    resources, structured content) as JSON, so nothing is silently dropped."""
+    parts = []
+    for block in result.content:
+        if getattr(block, "type", "") == "text":
+            parts.append(block.text)
+        else:
+            dumped = block.model_dump(mode="json", exclude_none=True)
+            parts.append(json.dumps(dumped, sort_keys=True))
+    structured = getattr(result, "structured_content", None)
+    if structured is not None:
+        parts.append(json.dumps({"structured_content": structured}, sort_keys=True))
+    return "\n".join(parts)
+
+
 class ConnectorLab:
     """One connector behind the gateway, as a Lab.
 
@@ -263,7 +330,6 @@ class ConnectorLab:
         self.screener = screener
         self.calls: list[dict[str, JsonValue]] = []
         self._offered = {name: tool for name, tool in profile.tools.items() if tool.action}
-        self._live: dict[str, str] | None = None
         hidden = sorted(set(profile.tools) - set(self._offered))
         self.info = LabInfo(
             name=f"connector-{profile.name}",
@@ -281,26 +347,15 @@ class ConnectorLab:
         self.checks = [self.pinned_definitions, self.screen_sequences]
 
     async def pinned_definitions(self, action: Action) -> Decision | None:
-        """Refuse a call to a tool whose definition changed since it was reviewed."""
+        """Refuse a call to a tool whose definition changed since it was reviewed.
+
+        Checked before every call, and again on the same connection as the call.
+        """
         tool = self._offered.get(action.tool)
         if tool is None:
             return None
-        if self._live is None:
-            listed = await _list_tools(self.profile.server)
-            self._live = {
-                name: definition_digest(name, description, schema)
-                for name, (description, schema) in listed.items()
-            }
-        live = self._live.get(action.tool)
-        if live == tool.definition_sha256:
-            return None
-        return Decision(
-            outcome="deny",
-            rule="connector:definition-changed",
-            reason=f"{action.tool} is no longer offered by the connector"
-            if live is None
-            else f"{action.tool} changed since it was reviewed; review the connector again",
-        )
+        listed = await _list_tools(self.profile.server)
+        return _definition_problem(action.tool, tool, listed)
 
     async def screen_sequences(self, action: Action) -> Decision | None:
         """Screen sequence arguments; refuse if any is flagged or can't be screened."""
@@ -341,17 +396,28 @@ class ConnectorLab:
 
         async def run(**arguments: Any) -> str:
             given = {key: value for key, value in arguments.items() if value is not None}
+            problem: Decision | None = None
+            result: Any = None
             try:
                 async with _client(lab.profile.server) as client:
-                    result = await client.call_tool(name, given)
+                    # Check the definition on the same connection that makes the call,
+                    # so a change after the gateway's check can't slip through.
+                    listed = await client.list_tools()
+                    problem = _definition_problem(
+                        name,
+                        spec,
+                        {t.name: (t.description or "", dict(t.input_schema)) for t in listed.tools},
+                    )
+                    if problem is None:
+                        result = await client.call_tool(name, given)
             except Exception as exc:
                 lab._record(name, given, None, error=type(exc).__name__)
-                raise ToolError(
-                    f"The connector could not be reached ({type(exc).__name__})"
-                ) from exc
-            text = "\n".join(
-                part.text for part in result.content if getattr(part, "type", "") == "text"
-            )
+                reason = type(exc).__name__
+                raise ToolError(f"The connector could not be reached ({reason})") from exc
+            if problem is not None:
+                lab._record(name, given, None, error="definition-changed")
+                raise ToolError(problem.reason)
+            text = _result_text(result)
             lab._record(name, given, text, error="tool-error" if result.is_error else None)
             if result.is_error:
                 raise ToolError(text or "The connector returned an error")

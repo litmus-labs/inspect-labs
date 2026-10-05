@@ -28,10 +28,13 @@ from inspect_labs.serve import LabSession  # noqa: E402
 
 FIXTURE = Path(__file__).parent / "fixtures" / "fake_connector.py"
 SERVER = ConnectorServer(
-    command=sys.executable, args=(str(FIXTURE),), env=("FAKE_CONNECTOR_CHANGED",)
+    command=sys.executable,
+    args=(str(FIXTURE),),
+    env=("FAKE_CONNECTOR_CHANGED", "FAKE_CONNECTOR_CHANGE_FLAG"),
 )
 TEMPLATE = {
     "search_literature": Classification(action="read", note="Queries only"),
+    "get_figure": Classification(action="read"),
     "order_sequence": Classification(
         action="external", sequence_arguments=("sequence",), note="Places an order"
     ),
@@ -52,15 +55,20 @@ def screener(outcome):
 
 
 def test_a_snapshot_pins_and_classifies_tools(profile):
-    assert set(profile.tools) == {"search_literature", "order_sequence", "write_notebook_entry"}
+    assert set(profile.tools) == {
+        "search_literature",
+        "order_sequence",
+        "get_figure",
+        "write_notebook_entry",
+    }
     assert profile.tools["write_notebook_entry"].action is None
     assert all(len(tool.definition_sha256) == 64 for tool in profile.tools.values())
 
 
 def test_unclassified_tools_are_not_offered(profile, tmp_path):
     lab = ConnectorLab(profile, tmp_path)
-    assert set(lab.info.operations) == {"search_literature", "order_sequence"}
-    assert len(lab.tools) == 2
+    assert set(lab.info.operations) == {"search_literature", "order_sequence", "get_figure"}
+    assert len(lab.tools) == 3
     assert "write_notebook_entry" in lab.info.notes
 
 
@@ -166,6 +174,8 @@ def test_built_in_templates_load_and_flag_writes():
     assert protocols["set_protocol_steps"].action == "irreversible"
     # A proxy tool hides the real tool in its arguments, so it fails closed.
     assert load_template("synapse")["call_read_tool"].action == "irreversible"
+    # A tool that hands work to another agent may write, so it is held.
+    assert load_template("benchling")["benchling_agent"].action == "irreversible"
     with pytest.raises(LookupError, match="built-in"):
         load_template("no-such-connector")
 
@@ -175,7 +185,17 @@ def test_cli_snapshots_a_connector_for_review(tmp_path):
     import subprocess
 
     template = tmp_path / "template.json"
-    template.write_text(json.dumps({"tools": {"search_literature": {"action": "read"}}}))
+    # Misclassify the notebook write as a read: the server's own hints disagree.
+    template.write_text(
+        json.dumps(
+            {
+                "tools": {
+                    "search_literature": {"action": "read"},
+                    "write_notebook_entry": {"action": "read"},
+                }
+            }
+        )
+    )
     result = subprocess.run(
         [sys.executable, "-m", "inspect_labs.cli", "connector", "snapshot", "fake-bio"]
         + ["--command", sys.executable, "--arg", str(FIXTURE)]
@@ -185,5 +205,46 @@ def test_cli_snapshots_a_connector_for_review(tmp_path):
         check=True,
     )
     report = json.loads(result.stdout)
-    assert report["tools"] == 3
-    assert report["unclassified"] == ["order_sequence", "write_notebook_entry"]
+    assert report["tools"] == 4
+    assert report["unclassified"] == ["get_figure", "order_sequence"]
+    assert report["server_hints_disagree"] == ["write_notebook_entry"]
+    profile = json.loads((tmp_path / "profile.json").read_text())
+    assert profile["tools"]["write_notebook_entry"]["server_hints"]["destructive"] is True
+
+
+def test_a_tool_changed_mid_session_is_refused(profile, tmp_path, monkeypatch):
+    flag = tmp_path / "changed"
+    monkeypatch.setenv("FAKE_CONNECTOR_CHANGE_FLAG", str(flag))
+    served = session(profile, tmp_path)
+
+    async def scenario():
+        first = await served.call("search_literature", {"query": "GFP"})
+        flag.write_text("now")  # The connector changes the tool after the first call.
+        with pytest.raises(ActionRefused, match="connector:definition-changed"):
+            await served.call("search_literature", {"query": "GFP"})
+        return first
+
+    assert "PMID 1" in anyio.run(scenario)
+    assert len(served.lab.calls) == 1
+
+
+def test_a_change_between_the_check_and_the_call_is_caught(profile, tmp_path, monkeypatch):
+    from inspect_ai.tool import ToolError
+
+    flag = tmp_path / "changed"
+    monkeypatch.setenv("FAKE_CONNECTOR_CHANGE_FLAG", str(flag))
+    lab = ConnectorLab(profile, tmp_path / "lab")
+    from inspect_ai.tool import ToolDef
+
+    (search,) = [t for t in lab.tools if ToolDef(t).name == "search_literature"]
+    flag.write_text("now")  # Changed after any check, before the call's own connection.
+    with pytest.raises(ToolError, match="changed since it was reviewed"):
+        anyio.run(lambda: search(query="GFP"))
+    assert lab.calls[0]["error"] == "definition-changed"
+
+
+def test_non_text_results_are_kept(profile, tmp_path):
+    served = session(profile, tmp_path)
+    text = anyio.run(served.call, "get_figure", {"id": "fig-1"})
+    assert '"type": "image"' in text and "image/png" in text
+    assert served.lab.calls[0]["result_chars"] == len(text) > 0

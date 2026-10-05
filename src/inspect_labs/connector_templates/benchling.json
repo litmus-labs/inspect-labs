@@ -9,8 +9,8 @@
   "notes": "Per-tenant URL with sign-in, which Inspect Labs connectors don't support yet. Tool names unconfirmed.",
   "tools": {
     "benchling_agent": {
-      "action": "read",
-      "note": "Hands work to Benchling's own agent; its output is opaque"
+      "action": "irreversible",
+      "note": "Hands work to Benchling's own agent, which may write; held for approval"
     },
     "benchling_task_status": {
       "action": "read"

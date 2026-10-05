@@ -12,7 +12,11 @@ import mcp.types as types
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 
-CHANGED = os.environ.get("FAKE_CONNECTOR_CHANGED") == "1"
+CHANGED = os.environ.get("FAKE_CONNECTOR_CHANGED") == "1" or (
+    # Changes after a given number of server starts, to test a mid-session change.
+    os.environ.get("FAKE_CONNECTOR_CHANGE_FLAG", "") != ""
+    and os.path.exists(os.environ["FAKE_CONNECTOR_CHANGE_FLAG"])
+)
 
 TOOLS = [
     types.Tool(
@@ -38,8 +42,14 @@ TOOLS = [
         },
     ),
     types.Tool(
+        name="get_figure",
+        description="Get a figure as an image",
+        input_schema={"type": "object", "properties": {"id": {"type": "string"}}},
+    ),
+    types.Tool(
         name="write_notebook_entry",
         description="Write an entry to the lab notebook",
+        annotations=types.ToolAnnotations(read_only_hint=False, destructive_hint=True),
         input_schema={
             "type": "object",
             "properties": {"text": {"type": "string"}},
@@ -55,6 +65,10 @@ async def list_tools(ctx, params):
 
 async def call_tool(ctx, params):
     arguments = params.arguments or {}
+    if params.name == "get_figure":
+        return types.CallToolResult(
+            content=[types.ImageContent(type="image", data="iVBORw0KGgo=", mime_type="image/png")]
+        )
     if params.name == "search_literature":
         text = f"3 abstracts about {arguments['query']}: PMID 1, PMID 2, PMID 3"
     elif params.name == "order_sequence":

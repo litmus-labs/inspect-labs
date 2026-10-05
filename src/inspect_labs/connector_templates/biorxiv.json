@@ -1,11 +1,12 @@
 {
   "connector": "biorxiv",
   "server": {
-    "url": "https://hcls.mcp.claude.com/biorxiv/mcp"
+    "url": "https://hcls.mcp.claude.com/biorxiv/mcp",
+    "official_manifest_url": "https://mcp.deepsense.ai/biorxiv/mcp"
   },
   "source": "https://github.com/anthropics/life-sciences",
   "confirmed": "tools/list, 2026-10-04",
-  "notes": "Preprints are not peer reviewed. No sign-in.",
+  "notes": "Preprints are not peer reviewed. No sign-in. Anthropic's life-sciences manifest points at official_manifest_url, which refused anonymous requests (403) on 2026-10-04; the Anthropic-hosted url answered without sign-in.",
   "tools": {
     "search_preprints": {
       "action": "read"
