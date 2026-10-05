@@ -7,8 +7,10 @@ password) as JSON lines. The log lives in the world's sandbox and disappears at
 teardown, so the Lab copies the episode's bytes out first.
 
 Lines land asynchronously and there is no end marker, so a read waits until the
-file stops growing. A short read, unparseable line or ``lost`` line makes the log
-incomplete, and an incomplete log never counts as a complete record.
+file has stopped growing for a whole quiet window (2 seconds by default). That is
+a heuristic, not a guarantee: an event later than the window would be missed. A
+log that never goes quiet, a short read, an unparseable line or a ``lost`` line
+makes the log incomplete, and an incomplete log never counts as a complete record.
 """
 
 from __future__ import annotations
@@ -21,7 +23,6 @@ import anyio
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 SETTLE_INTERVAL = 0.2
-SETTLE_ATTEMPTS = 50
 COPY_PATH = "/tmp/inspect-labs-world-log.part"
 
 
@@ -36,6 +37,10 @@ class WorldLogSpec(BaseModel):
     service: str = Field(default="world", min_length=1)
     log_path: str = Field(default="/var/lib/fictionet/log.jsonl", pattern=r"^/[A-Za-z0-9._/-]+$")
     """An absolute path of plain characters, since it is used in shell commands."""
+    quiet_seconds: float = Field(default=2.0, gt=0)
+    """How long the log must stop growing before it counts as settled."""
+    max_wait_seconds: float = Field(default=30.0, gt=0)
+    """How long to wait for it to settle before calling it incomplete."""
 
 
 class ExecResult(Protocol):
@@ -91,14 +96,24 @@ async def log_size(world: Sandbox, spec: WorldLogSpec) -> int:
 
 
 async def settled_size(world: Sandbox, spec: WorldLogSpec) -> tuple[int, bool]:
-    """Wait until the log stops growing. Returns its size and whether it settled."""
+    """Wait until the log has not grown for ``spec.quiet_seconds``.
+
+    Returns its size and whether it settled within ``spec.max_wait_seconds``.
+    """
+    interval = min(SETTLE_INTERVAL, spec.quiet_seconds)
     size = await log_size(world, spec)
-    for _ in range(SETTLE_ATTEMPTS):
-        await anyio.sleep(SETTLE_INTERVAL)
+    quiet = 0.0
+    waited = 0.0
+    while waited < spec.max_wait_seconds:
+        await anyio.sleep(interval)
+        waited += interval
         latest = await log_size(world, spec)
         if latest == size:
-            return size, True
-        size = latest
+            quiet += interval
+            if quiet >= spec.quiet_seconds:
+                return size, True
+        else:
+            size, quiet = latest, 0.0
     return size, False
 
 

@@ -14,8 +14,9 @@ from inspect_ai.solver import Generate, Solver, TaskState, generate, solver
 from inspect_ai.tool import ToolCall
 from pydantic import JsonValue
 
-from inspect_labs.actions import DEFAULT_RULES
+from inspect_labs.actions import DEFAULT_RULES, Action
 from inspect_labs.bindings import LabLog, connect_lab
+from inspect_labs.gateway import Approval
 from inspect_labs.monitors import DEFAULT_MONITORS
 from inspect_labs.tasks import OUTCOME_METRICS, final_answer, report_outcome
 from inspect_labs_ot.lab import WaterPlantLab
@@ -114,11 +115,12 @@ def water_plant_supervision(
     scripted: ScriptedControl | None = None,
     repository: str | None = None,
     lab_log_dir: str = ".research/ot-lab-logs",
+    unattended_approval: bool = False,
 ) -> Task:
     """Evaluate an agent supervising a simulated water plant through two safety layers.
 
     Every proposal passes the Inspect Labs gateway (declared ranges and rules; with
-    the default rules, irreversible proposals need an approver, so none run without
+    the default rules, irreversible proposals need approval, so none run without
     one) and the plant's own safety gate. The lab log records both, with ground
     truth the agent never sees.
 
@@ -128,6 +130,9 @@ def water_plant_supervision(
         scripted: Use an explicit deterministic actor control instead of generation.
         repository: Checkout of the OT AI Assurance Lab; defaults to ``OT_ASSURANCE_LAB``.
         lab_log_dir: Private, durable directory for lab logs.
+        unattended_approval: Approve every proposal the plant's gate allows, with no
+            person involved, recorded as approved by an unattended stand-in. Off by
+            default, so held proposals are refused unless a person approves them.
     """
     native = Task(
         dataset=[
@@ -150,15 +155,15 @@ def water_plant_supervision(
         lab_log_dir=directory,
         metrics=METRICS,
         rules=DEFAULT_RULES,
-        approver=_operator_approves_everything_the_gate_allows,
+        approver=_unattended_stand_in if unattended_approval else None,
         monitors=DEFAULT_MONITORS,
     )
 
 
-def _operator_approves_everything_the_gate_allows(action: object) -> bool:
-    """A stand-in operator for unattended runs: approves every held proposal.
+def _unattended_stand_in(action: Action) -> Approval:
+    """Approve for unattended evaluation runs, and say so in the lab log.
 
     The plant's gate has already run as a domain check, so only proposals it
-    accepted or clipped reach this point. A real deployment needs a person here.
+    accepted or clipped reach this point. No person reviewed them.
     """
-    return True
+    return Approval(approved=True, by="stand-in:unattended-evaluation")

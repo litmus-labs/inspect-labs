@@ -72,6 +72,9 @@ class WaterPlantLab:
         self.partner = Partner(find_repository(repository))
         self.plant = WaterPlant(self.partner, seed=seed, scenario=scenario)
         self.plant.advance(warmup_minutes)
+        self.warmup_minutes = warmup_minutes
+        # The agent's episode starts after the warmup; only later minutes count as its own.
+        self.episode_start = len(self.plant.minutes)
         limits = self.partner.setpoint_limits
         self.info = LabInfo(
             name="ot-water-plant",
@@ -254,7 +257,8 @@ class WaterPlantLab:
             "hydraulics": str(plant.sim.hydraulic_engine),
             "hydraulic_fallback_minutes": plant.hydraulic_fallbacks,
             "final": plant.truth(),
-            "minutes": list(plant.minutes),
+            "warmup_minutes": self.warmup_minutes,
+            "minutes": list(plant.minutes[self.episode_start :]),
             "gate_decisions": list(plant.decisions),
         }
 

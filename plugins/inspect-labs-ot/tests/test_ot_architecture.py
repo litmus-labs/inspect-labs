@@ -25,6 +25,7 @@ def test_source_inventory_and_dependency_direction():
             "pydantic",
             "inspect_labs.actions",
             "inspect_labs.bindings",
+            "inspect_labs.gateway",
             "inspect_labs.monitors",
             "inspect_labs.tasks",
             "inspect_labs_ot.lab",
