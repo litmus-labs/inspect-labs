@@ -5,7 +5,13 @@ tone_instructions: "Plain and direct. Report real problems with a concrete failu
 reviews:
   profile: chill
   request_changes_workflow: false
-  high_level_summary: true
+  # Never write a summary into the PR description, which authors keep short and the
+  # PR description check reads; the walkthrough comment still describes the changes.
+  high_level_summary: false
+  high_level_summary_in_walkthrough: true
+  # A summary is still written wherever this placeholder appears, so use one nobody
+  # types by accident instead of the default "@coderabbitai summary".
+  high_level_summary_placeholder: "@coderabbitai-summary-disabled-in-this-repository"
   poem: false
   review_status: true
   auto_review:
