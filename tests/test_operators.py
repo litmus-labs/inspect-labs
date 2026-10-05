@@ -52,7 +52,8 @@ def test_journal_entries_chain_and_check(tmp_path):
     journal.append("ended", {})
     journal.close()
     checked = read_journal(tmp_path / "j.jsonl")
-    assert [e.kind for e in checked.entries] == ["started", "ended"]
+    assert [e.kind for e in checked.entries] == ["opened", "started", "ended"]
+    assert checked.id == journal.id
     assert checked.ended and not checked.torn_tail and checked.head == journal.head
     assert os.stat(tmp_path / "j.jsonl").st_mode & 0o777 == 0o600
     with pytest.raises(FileExistsError):
@@ -65,9 +66,9 @@ def test_a_changed_entry_breaks_the_journal(tmp_path):
     journal.append("ended", {})
     journal.close()
     lines = (tmp_path / "j.jsonl").read_text().splitlines()
-    entry = json.loads(lines[0])
+    entry = json.loads(lines[1])
     entry["body"]["lab"] = "y"
-    (tmp_path / "j.jsonl").write_text(json.dumps(entry) + "\n" + lines[1] + "\n")
+    (tmp_path / "j.jsonl").write_text("\n".join([lines[0], json.dumps(entry), lines[2]]) + "\n")
     with pytest.raises(ValueError, match="digest"):
         read_journal(tmp_path / "j.jsonl")
 
@@ -77,9 +78,9 @@ def test_a_crash_mid_write_leaves_a_readable_journal(tmp_path):
     journal.append("started", {})
     journal.close()
     with (tmp_path / "j.jsonl").open("a") as stream:
-        stream.write('{"sequence": 2, "at"')
+        stream.write('{"sequence": 3, "at"')
     checked = read_journal(tmp_path / "j.jsonl")
-    assert checked.torn_tail and not checked.ended and len(checked.entries) == 1
+    assert checked.torn_tail and not checked.ended and len(checked.entries) == 2
 
 
 def test_a_witness_catches_a_rewritten_journal(tmp_path):
@@ -95,8 +96,53 @@ def test_a_witness_catches_a_rewritten_journal(tmp_path):
     forged.append("started", {"lab": "other"})
     forged.append("ended", {})
     forged.close()
+    # The rebuilt journal has a new id the witness never saw.
     problems = check_witness(read_journal(tmp_path / "j.jsonl"), witness)
-    assert problems and "differs from its witnessed digest" in problems[0]
+    assert problems == ["the witness has no record of this journal"]
+
+
+def test_a_rebuilt_journal_that_copies_the_id_is_caught(tmp_path):
+    witness = tmp_path / "witness.txt"
+    journal = Journal(tmp_path / "j.jsonl", witness=witness_file(witness))
+    journal.append("started", {"lab": "x"})
+    journal.close()
+    lines = (tmp_path / "j.jsonl").read_text().splitlines()
+    (tmp_path / "j.jsonl").unlink()
+    forged = Journal(tmp_path / "forged.jsonl")
+    forged.close()
+    # Keep the original first entry (and id), then append a different rebuilt history.
+    forged_lines = [lines[0]]
+    from inspect_labs.journal import _digest
+
+    head = json.loads(lines[0])["sha256"]
+    body = {"lab": "other"}
+    at = "2026-10-04T00:00:00+00:00"
+    digest = _digest(head, 2, at, "started", body)
+    forged_lines.append(
+        json.dumps(
+            {
+                "sequence": 2,
+                "at": at,
+                "kind": "started",
+                "body": body,
+                "previous": head,
+                "sha256": digest,
+            }
+        )
+    )
+    (tmp_path / "j.jsonl").write_text("\n".join(forged_lines) + "\n")
+    problems = check_witness(read_journal(tmp_path / "j.jsonl"), witness)
+    assert any("differs from its witnessed digest" in p for p in problems)
+
+
+def test_one_witness_file_serves_many_journals(tmp_path):
+    witness = tmp_path / "witness.txt"
+    for name in ("a", "b"):
+        journal = Journal(tmp_path / f"{name}.jsonl", witness=witness_file(witness))
+        journal.append("started", {"lab": name})
+        journal.close()
+    for name in ("a", "b"):
+        assert check_witness(read_journal(tmp_path / f"{name}.jsonl"), witness) == []
 
 
 # Approval queue and gateway
@@ -125,7 +171,7 @@ def test_an_operator_approves_a_waiting_action(tmp_path):
     )
     journal.close()
     kinds = [e.kind for e in read_journal(tmp_path / "j.jsonl").entries]
-    assert kinds == ["decided", "approval", "finished"]
+    assert kinds == ["opened", "decided", "approval", "finished"]
 
 
 def test_nobody_answering_refuses(tmp_path):
@@ -231,6 +277,53 @@ def test_operators_use_the_control_socket(short_dir):
     assert not socket_path.exists()
 
 
+def test_a_live_control_socket_is_never_taken_over(short_dir):
+    first = Control(Gateway(OPERATIONS, DEFAULT_RULES))
+    second = Control(Gateway(OPERATIONS, DEFAULT_RULES))
+    socket_path = short_dir / "control.sock"
+    outcome = {}
+
+    async def scenario():
+        async with anyio.create_task_group() as group:
+            group.start_soon(serve_control, first, socket_path)
+            while not socket_path.exists():
+                await anyio.sleep(0.01)
+            try:
+                await serve_control(second, socket_path)
+            except FileExistsError as exc:
+                outcome["error"] = str(exc)
+            outcome["first"] = await anyio.to_thread.run_sync(
+                lambda: send_control(socket_path, ControlRequest(command="status"))
+            )
+            group.cancel_scope.cancel()
+
+    anyio.run(scenario)
+    assert "already listening" in outcome["error"]
+    assert outcome["first"]["ok"]
+
+
+def test_a_stale_control_socket_is_replaced(short_dir):
+    import socket as sockets
+
+    socket_path = short_dir / "control.sock"
+    stale = sockets.socket(sockets.AF_UNIX, sockets.SOCK_STREAM)
+    stale.bind(str(socket_path))
+    stale.close()  # The file stays, but nothing listens: a crashed session.
+    control = Control(Gateway(OPERATIONS, DEFAULT_RULES))
+
+    async def scenario():
+        async with anyio.create_task_group() as group:
+            group.start_soon(serve_control, control, socket_path)
+            await anyio.sleep(0.2)
+            reply = await anyio.to_thread.run_sync(
+                lambda: send_control(socket_path, ControlRequest(command="status"))
+            )
+            group.cancel_scope.cancel()
+        return reply
+
+    assert anyio.run(scenario)["ok"]
+
+
 def test_the_control_socket_needs_a_private_directory(short_dir):
     shared = short_dir / "shared"
     shared.mkdir(mode=0o755)
@@ -282,7 +375,7 @@ def test_a_tripwire_stops_the_session_and_everything_is_journaled(tmp_path):
     assert "repeated-refusals" in [flag.monitor for flag in log.flags]
     checked = _read_journal(tmp_path / "session.journal.jsonl")
     kinds = [entry.kind for entry in checked.entries]
-    assert kinds[0] == "started" and kinds[-1] == "ended" and "stopped" in kinds
+    assert kinds[:2] == ["opened", "started"] and kinds[-1] == "ended" and "stopped" in kinds
     assert kinds.count("decided") == 3 and kinds.count("flag") >= 3
     # The lab log points at the journal as it was just before the lab log was written.
     assert log.journal_sha256 == checked.entries[-2].sha256

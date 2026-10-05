@@ -33,5 +33,8 @@ task = connect_world(
 - Commands are allowed inside the closed world by default. Holding a specific
   request, such as a password form, for approval before it reaches a site needs a
   hook inside the world; none exists yet.
+- With no end marker, the log counts as complete once it has stopped growing for a
+  quiet window (2 seconds by default, `WorldLogSpec.quiet_seconds`). An event later
+  than that would be missed.
 - Fictionet worlds use the wall clock and fresh randomness, so runs are not
   reproducible; the saved world log is the record.

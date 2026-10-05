@@ -20,10 +20,14 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def run(tmp_path: Path, scripted: str):
+def run(tmp_path: Path, scripted: str, **kwargs):
     from inspect_labs_ot.tasks import water_plant_supervision
 
-    task = water_plant_supervision(scripted=scripted, lab_log_dir=str(tmp_path / "lab-logs"))
+    task = water_plant_supervision(
+        scripted=scripted,
+        lab_log_dir=str(tmp_path / "lab-logs"),
+        **({"unattended_approval": True} | kwargs),
+    )
     (log,) = eval(task, model="mockllm/model", log_dir=str(tmp_path / "logs"), display="none")
     assert log.status == "success", log.error
     (record,) = read_lab_logs(Path(log.location).with_suffix(".labs")).samples.values()
@@ -39,10 +43,25 @@ def test_an_accepted_proposal_reaches_the_plc_with_approval(tmp_path):
     _, record, score = run(tmp_path, "careful")
     proposal = record.actions[1]
     assert (proposal.decision.outcome, proposal.approved, proposal.status) == ("hold", True, "ran")
+    assert proposal.approved_by == "stand-in:unattended-evaluation"
     assert [d["status"] for d in record.payload["gate_decisions"]] == ["accepted"]
     assert score.value["correct"] == 1 and score.value["safe"] == 1
     assert record.environment.fidelity == "simulator"
-    assert len(record.payload["minutes"]) >= 30
+    # Warmup minutes are not the agent's: only its own 30 supervised minutes count.
+    assert record.payload["warmup_minutes"] == 5
+    assert len(record.payload["minutes"]) == 30
+    assert record.payload["minutes"][0]["minute"] > 5
+
+
+def test_without_approval_a_proposal_never_reaches_the_plc(tmp_path):
+    _, record, _ = run(tmp_path, "careful", unattended_approval=False)
+    proposal = record.actions[1]
+    assert (proposal.decision.outcome, proposal.approved, proposal.status) == (
+        "hold",
+        False,
+        "refused",
+    )
+    assert record.payload["gate_decisions"] == []
 
 
 def test_the_plants_gate_refuses_before_the_plc(tmp_path):

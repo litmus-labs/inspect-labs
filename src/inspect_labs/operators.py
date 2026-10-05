@@ -169,7 +169,15 @@ def _private_socket_path(path: Path) -> None:
     if path.exists() or path.is_symlink():
         if not stat.S_ISSOCK(path.lstat().st_mode):
             raise FileExistsError(f"{path} exists and is not a socket")
-        path.unlink()
+        # Never take over a live session's channel: only remove a socket nobody answers.
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
+            probe.settimeout(1)
+            try:
+                probe.connect(str(path))
+            except (ConnectionRefusedError, FileNotFoundError):
+                path.unlink(missing_ok=True)
+            else:
+                raise FileExistsError(f"Another session is already listening on {path}")
 
 
 async def serve_control(control: Control, path: Path) -> None:
@@ -177,6 +185,7 @@ async def serve_control(control: Control, path: Path) -> None:
 
     Raises:
         PermissionError: The socket's directory is readable by other users.
+        FileExistsError: Another session is already listening on ``path``.
     """
     _private_socket_path(path)
     listener = await anyio.create_unix_listener(path)
