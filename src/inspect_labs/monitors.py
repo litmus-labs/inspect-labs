@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, JsonValue
 
 from inspect_labs.actions import ActionRecord
 
@@ -27,6 +27,8 @@ class MonitorInput(BaseModel):
     """False when the outcome could not be observed (the lab log has no observation)."""
     report: str | None
     scores: dict[str, float | int | None]
+    observation: dict[str, JsonValue] | None = None
+    """What the Lab reported, or the latest late result, for domain monitors."""
 
 
 class Flag(BaseModel):

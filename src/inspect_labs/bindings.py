@@ -34,7 +34,7 @@ from inspect_labs.actions import (
     replay_decisions,
 )
 from inspect_labs.errors import CompatibilityError, SafetyAbort
-from inspect_labs.gateway import ActionRefused, Approver, Gateway
+from inspect_labs.gateway import ActionRefused, Approver, Check, Gateway
 from inspect_labs.monitors import Flag, Monitor, MonitorInput, run_monitors
 from inspect_labs.spec import OperationSpec, Requirements, compatibility_problems
 
@@ -96,6 +96,21 @@ class Lab(Protocol):
     async def close(self) -> None:
         """Release client resources without claiming outstanding work has stopped."""
         ...
+
+
+def lab_checks(lab: Lab) -> tuple[Check, ...]:
+    """A Lab's own domain checks, from an optional ``checks`` attribute.
+
+    A Lab can declare checks that only it can make, such as a plant's safety gates
+    that read its current state. They run in the gateway after the rules.
+
+    Raises:
+        TypeError: ``checks`` is not a sequence of callables.
+    """
+    declared = getattr(lab, "checks", ())
+    if not isinstance(declared, (list, tuple)) or not all(callable(c) for c in declared):
+        raise TypeError("A Lab's checks must be a list or tuple of callables")
+    return tuple(declared)
 
 
 def _safety_abort(environment: Lab) -> str | None:
@@ -500,6 +515,7 @@ def _monitor_input(
         observed=observed,
         report=report,
         scores=scores,
+        observation=record.late_results[-1].payload if record.late_results else record.payload,
     )
 
 
@@ -620,6 +636,7 @@ def connect_lab(
     rules: ActionRules | None = None,
     approver: Approver | None = None,
     monitors: Sequence[Monitor] = (),
+    checks: Sequence[Check] = (),
 ) -> Task:
     """Connect a native Inspect task to a Lab, keeping its own solver.
 
@@ -643,6 +660,8 @@ def connect_lab(
         approver: Called for actions the rules hold; returns True only if a person
             approved. Without one, held actions are refused.
         monitors: Run after scoring each sample; flags go into the score's metadata.
+        checks: Domain checks run after ``rules``, together with the Lab's own
+            ``checks``. They can make a decision stricter, never looser. Need ``rules``.
 
     Returns:
         The native Task, with setup, scorer and cleanup bindings installed.
@@ -650,6 +669,7 @@ def connect_lab(
     Raises:
         ValueError: The task already has a scorer; outcome ownership must be explicit.
         TypeError: Neither or both of ``scorer`` and ``judge`` were passed.
+        ValueError: ``checks`` were passed without ``rules``.
 
     Samples raise ``CompatibilityError`` before dispatch when the Lab does not
     satisfy ``requires`` or is physical without ``allow_physical``. A provider that sets
@@ -659,6 +679,8 @@ def connect_lab(
         requires if isinstance(requires, Requirements) else Requirements(capabilities=requires)
     )
     outcome = _scorer_argument(scorer, judge, "connect_lab")
+    if checks and rules is None:
+        raise ValueError("Domain checks run in the gateway; pass rules to turn it on")
     if task.scorer:
         raise ValueError("Bind an unscored Task; the lab scorer owns the outcome")
     keys = _metric_keys(metrics)
@@ -715,7 +737,13 @@ def connect_lab(
             _sessions[state.uuid] = session
             lab_tools = provider.tools
             if rules is not None:
-                gateway = Gateway(session.info.operations, rules, approver, records=session.actions)
+                gateway = Gateway(
+                    session.info.operations,
+                    rules,
+                    approver,
+                    records=session.actions,
+                    checks=(*lab_checks(provider), *checks),
+                )
                 lab_tools = [_checked_tool(lab_tool, gateway) for lab_tool in lab_tools]
             state.tools = [*state.tools, *lab_tools]
             return state

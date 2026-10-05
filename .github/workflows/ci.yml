@@ -22,11 +22,17 @@ env:
     -e ./plugins/inspect-labs-commec[dev]
     -e ./plugins/inspect-labs-plate-reader
     -e ./plugins/inspect-labs-sila
+    -e ./plugins/inspect-labs-ot
+    -e ./plugins/inspect-labs-fictionet
   PLUGIN_TESTS: >-
     plugins/inspect-labs-opentrons/tests
     plugins/inspect-labs-commec/tests
     plugins/inspect-labs-plate-reader/tests
     plugins/inspect-labs-sila/tests
+    plugins/inspect-labs-ot/tests
+    plugins/inspect-labs-fictionet/tests
+  # Partner simulators the plugins import from a checkout, pinned to tested commits.
+  OT_ASSURANCE_LAB_COMMIT: c7361ceb812a8d92b45ebf5cdeb5be794f5bfe15
 
 jobs:
   lint:
@@ -66,7 +72,16 @@ jobs:
           uv python install 3.12
           uv venv --no-project --python 3.12 .venv
           uv pip install --python .venv/bin/python $PACKAGES
+      - name: Check out the OT AI Assurance Lab
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: xienanzheng/ot-ai-assurance-lab
+          ref: ${{ env.OT_ASSURANCE_LAB_COMMIT }}
+          path: .partners/ot-ai-assurance-lab
+          persist-credentials: false
       - name: Pytest
+        env:
+          OT_ASSURANCE_LAB: ${{ github.workspace }}/.partners/ot-ai-assurance-lab
         run: .venv/bin/python -m pytest tests $PLUGIN_TESTS
 
   installed:

@@ -54,6 +54,17 @@ class Decision(BaseModel):
     outcome: Outcome
     rule: str
     reason: str
+    source: Literal["rules", "check"] = "rules"
+    """``rules``: decided by the rule file. ``check``: decided by a domain check, such as
+    a plant's safety gate, which may depend on the Lab's state at the time."""
+
+
+_STRICTNESS: dict[Outcome, int] = {"allow": 0, "hold": 1, "deny": 2}
+
+
+def stricter(first: Decision, second: Decision) -> Decision:
+    """The stricter of two decisions (deny, then hold, then allow); ``first`` on a tie."""
+    return second if _STRICTNESS[second.outcome] > _STRICTNESS[first.outcome] else first
 
 
 class Rule(BaseModel):
@@ -143,6 +154,8 @@ class ActionRecord(BaseModel):
     decision: Decision
     approved: bool | None = None
     """For a held action: whether a person approved it. None when not held."""
+    approved_by: str | None = None
+    """Who or what approved a held action, such as a lease's name, when known."""
     status: Literal["ran", "refused", "error"]
     """``ran``: the tool returned. ``refused``: blocked before reaching the Lab.
     ``error``: allowed, but the tool raised; the Lab may or may not have acted."""
@@ -169,10 +182,16 @@ def replay_decisions(
 
     Shows what a rule change would have done to a past run. It does not show what
     the agent would have done next, since the agent saw the original decisions.
+
+    A domain check may have depended on the Lab's state, which can't be recomputed
+    offline. Its recorded decision is kept, and the stricter of it and the new
+    rules' decision is the replayed one.
     """
     replayed = []
     for record in records:
         decision = policy.decide(record.action, operations)
+        if record.decision.source == "check":
+            decision = stricter(decision, record.decision)
         replayed.append(
             ReplayedDecision(
                 sequence=record.sequence,

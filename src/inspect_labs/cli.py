@@ -30,7 +30,14 @@ from inspect_labs.bindings import (
 )
 from inspect_labs.conformance import diagnose
 from inspect_labs.evidence import rescore_evidence
-from inspect_labs.gateway import ApprovedAction, approved_actions
+from inspect_labs.gateway import (
+    ApprovedAction,
+    Approver,
+    Lease,
+    approved_actions,
+    first_approval,
+    leased_actions,
+)
 from inspect_labs.liquid_tasks import serial_dilution_outcome, worklist_outcome
 from inspect_labs.monitors import DEFAULT_MONITORS
 from inspect_labs.plugins import Kind, available, canonical, resolve
@@ -134,6 +141,12 @@ def main() -> None:
         "--approvals",
         type=Path,
         help="Actions approved in advance, as a JSON list of {tool, arguments}",
+    )
+    serve.add_argument(
+        "--leases",
+        type=Path,
+        help="Time-limited permissions, as a JSON list of "
+        "{name, tool, match, expires_at, uses, granted_by, reason}",
     )
     serve.add_argument(
         "--stop-file",
@@ -437,12 +450,16 @@ def _serve(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
                 if args.rules
                 else DEFAULT_RULES
             )
-            approver = None
+            approvers: list[Approver] = []
             if args.approvals:
                 approved = TypeAdapter(list[ApprovedAction]).validate_json(
                     args.approvals.read_text()
                 )
-                approver = approved_actions(approved)
+                approvers.append(approved_actions(approved))
+            if args.leases:
+                leases = TypeAdapter(list[Lease]).validate_json(args.leases.read_text())
+                approvers.append(leased_actions(leases))
+            approver = first_approval(*approvers) if approvers else None
         except (LookupError, ValueError, OSError) as exc:
             parser.error(f"Cannot serve: {type(exc).__name__}: {exc}")
         session = LabSession(lab, rules, approver=approver, stop_file=args.stop_file)
