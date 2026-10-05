@@ -10,6 +10,13 @@ independent safety controls. Native logs and companion evidence can contain
 private data. Keep evaluation answers and provider observations outside the
 agent's control and review any artifact before sharing it.
 
+## Automated checks
+
+Every pull request is scanned by CodeQL (Python and workflows), by dependency review
+for known vulnerable packages, and by CodeRabbit's security tools. Pushes containing
+secrets are blocked, and Dependabot opens updates for vulnerable dependencies. These
+catch common mistakes; they are not a security audit.
+
 ## Reporting a vulnerability
 
 Do not post sensitive vulnerabilities, credentials, biological misuse scenarios

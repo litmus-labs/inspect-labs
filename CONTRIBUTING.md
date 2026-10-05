@@ -30,8 +30,14 @@ new actions. Distinguish software mechanics from scientific and physical validit
 ## Checks and reviews
 
 Every pull request runs CI: lint and strict types, tests, the installed-package
-check and the documentation site. All four must pass before merge. Site changes
-also get a Vercel preview link.
+check and the documentation site. All four must pass before merge, the branch must
+be up to date with `main`, and every review conversation must be resolved. Site
+changes also get a Vercel preview link.
+
+Security checks run on every pull request too. CodeQL scans the Python code and the
+GitHub Actions workflows (also weekly), dependency review blocks new dependencies
+with known high-severity vulnerabilities, and secret scanning blocks pushes that
+contain credentials. Findings appear under the repository's Security tab.
 
 Reviews are layered so each catches different problems. All of them check
 [the review guide](.github/REVIEW_GUIDE.md).
