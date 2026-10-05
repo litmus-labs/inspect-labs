@@ -1,0 +1,58 @@
+# yaml-language-server: $schema=https://www.coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit reviews every pull request against .github/REVIEW_GUIDE.md.
+language: en-US
+tone_instructions: "Plain and direct. Report real problems with a concrete failure scenario; skip praise and style nits ruff already enforces."
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches: [".*"]
+  path_filters:
+    - "!site/_site/**"
+    - "!**/*.pdf"
+    - "!site/assets/**"
+    - "!uv.lock"
+  path_instructions:
+    - path: "src/inspect_labs/{gateway,actions,operators,serve,connectors}.py"
+      instructions: >-
+        Safety boundary. Check that every tool call passes the Gateway; that refused,
+        unapproved or stopped actions never reach the Lab or connector; that every
+        failure path (exceptions in checks, approvers, screeners, connectors) refuses
+        rather than allows; and that evaluation and serving decide the same way.
+    - path: "src/inspect_labs/{bindings,journal,release}.py"
+      instructions: >-
+        Evidence integrity. Unknown outcomes must stay unknown (null), never pass,
+        fail or zero. Rescoring, replay, monitor, attach, release and verify must
+        never dispatch an action. Digests must stay stable for old files and across
+        processes, and must not verify a changed record. Withheld release fields must
+        not leak.
+    - path: "src/inspect_labs/connector_templates/*.json"
+      instructions: >-
+        Classifications are safety decisions. Anything that writes, deletes, shares,
+        uploads, orders, starts paid compute or delegates to another agent must not
+        be classified as read.
+    - path: "plugins/**"
+      instructions: >-
+        Partner and instrument adapters. Check that simulated results are never
+        presented as real-instrument or physical-safety evidence, that ground truth
+        stays out of what the agent sees, and that no partner code is copied.
+    - path: "{site,docs}/**/*.{qmd,md}"
+      instructions: >-
+        Plain, purpose-first prose. Flag claims beyond what tests with simulators and
+        mocks show, coined jargon, and any private or .research content.
+    - path: "tests/**"
+      instructions: >-
+        Tests should exercise user, persistence and untrusted-input boundaries and
+        assert the failure behavior, not only the happy path.
+chat:
+  auto_reply: true
+knowledge_base:
+  code_guidelines:
+    filePatterns:
+      - ".github/REVIEW_GUIDE.md"
+      - "AGENTS.md"

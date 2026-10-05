@@ -38,6 +38,7 @@ Reviews are layered so each catches different problems. All of them check
 
 | Reviewer | When | Why |
 |---|---|---|
+| CodeRabbit | Every pull request, automatically; `@coderabbitai review` to ask again | A summary plus line-by-line review, with per-path rules in `.coderabbit.yaml` |
 | Greptile | Every pull request, automatically | Reads the whole codebase, so it catches changes that break code elsewhere |
 | Claude | Code pull requests when opened; `@claude` to ask again | Checks the review guide's rules line by line |
 | Codex | `scripts/codex-review-pr.sh PR --post` (Codex CLI), or `/codex:review` in Claude Code, on higher-risk changes | An independent second opinion from a different model |
