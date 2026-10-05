@@ -30,7 +30,7 @@ def test_a_good_title_and_description_pass():
 def test_the_untouched_template_fails():
     issues = check.problems(TITLE, TEMPLATE)
     assert any("guidance comment" in issue for issue in issues)
-    assert any("two paragraphs" in issue for issue in issues)
+    assert any("two prose paragraphs" in issue for issue in issues)
 
 
 def test_titles_need_a_type_and_a_short_outcome():
@@ -67,3 +67,20 @@ def test_the_script_reads_the_event_and_reports(tmp_path):
 
 def test_bot_pull_requests_are_not_checked(tmp_path):
     assert run(tmp_path, "Bump x from 1 to 2", "Bumps x.", user_type="Bot").returncode == 0
+
+
+def test_headings_and_lists_dont_count_as_paragraphs():
+    issues = check.problems(TITLE, "## Summary\n\n- Changed the gate\n")
+    assert any("headings" in issue for issue in issues)
+    assert any("two prose paragraphs" in issue for issue in issues)
+    only_lists = "- Changed the gate\n\n1. Ran tests\n\n> A quote\n\n| a | b |\n"
+    assert any("two prose paragraphs" in issue for issue in check.problems(TITLE, only_lists))
+
+
+def test_a_list_alongside_two_paragraphs_is_fine():
+    assert check.problems(TITLE, BODY + "\n- One remaining risk to watch.\n") == []
+
+
+def test_headings_inside_code_blocks_dont_count():
+    body = BODY + "\n```markdown\n## Example heading\n```\n"
+    assert check.problems(TITLE, body) == []
