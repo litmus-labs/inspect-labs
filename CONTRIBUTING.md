@@ -29,8 +29,21 @@ new actions. Distinguish software mechanics from scientific and physical validit
 
 ## Checks and reviews
 
-Every pull request runs CI: lint and strict types, tests, the installed-package
-check and the documentation site. All four must pass before merge. Site changes
+Every pull request must pass these checks before it can merge into `main`:
+
+| Check | What it checks |
+|---|---|
+| `validate` | Ruff lint and format, and strict mypy |
+| `test` | The test suite, including partner Labs |
+| `Installed packages` | Wheels build, install outside the checkout and run |
+| `Documentation site` | The site renders with no broken links |
+| `PR description` | A `type(scope): outcome` title and a short plain-paragraph description, as the template asks |
+| `Codex review` | A Codex review of the latest commit found no P0–P2 problems |
+
+The branch must also be up to date with `main`, and every review conversation must be
+resolved. `Codex review` is set by `scripts/codex-review-pr.sh PR --post`, which runs
+on your ChatGPT subscription: run it after each push, fix what it finds, and run it
+again until it passes. Auto-merge then merges once everything is green. Site changes
 also get a Vercel preview link.
 
 Reviews are layered so each catches different problems. All of them check
@@ -38,9 +51,10 @@ Reviews are layered so each catches different problems. All of them check
 
 | Reviewer | When | Why |
 |---|---|---|
+| CodeRabbit | Every pull request, automatically; `@coderabbitai review` to ask again | A summary plus line-by-line review, with per-path rules in `.coderabbit.yaml` |
 | Greptile | Every pull request, automatically | Reads the whole codebase, so it catches changes that break code elsewhere |
 | Claude | Code pull requests when opened; `@claude` to ask again | Checks the review guide's rules line by line |
-| Codex | Comment `@codex review` on higher-risk changes | An independent second opinion from a different model |
+| Codex | `scripts/codex-review-pr.sh PR --post` after every push; its `Codex review` status gates merging | An independent second opinion from a different model |
 | A maintainer | Every pull request | Decides; automated reviews advise |
 
 Higher-risk changes are those touching the gateway, action rules, lab logs and

@@ -1,0 +1,26 @@
+{
+  "connector": "synapse",
+  "server": {
+    "url": "https://mcp.synapse.org/mcp"
+  },
+  "source": "https://github.com/Sage-Bionetworks/synapse-mcp",
+  "confirmed": "repository source, 2026-10-04",
+  "notes": "MIT. Needs OAuth sign-in, which Inspect Labs connectors don't support yet. Its proxy tools hide the real tool in their arguments, so every call is held.",
+  "tools": {
+    "search_tools": {
+      "action": "read"
+    },
+    "call_read_tool": {
+      "action": "irreversible",
+      "note": "Runs a tool named in its arguments; the gateway can't see which, so it fails closed"
+    },
+    "call_write_tool": {
+      "action": "irreversible",
+      "note": "Runs a write tool named in its arguments, including deletes and sharing"
+    },
+    "call_tool": {
+      "action": "irreversible",
+      "note": "Runs a tool named in its arguments; the gateway can't see which, so it fails closed"
+    }
+  }
+}

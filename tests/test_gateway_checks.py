@@ -154,3 +154,37 @@ def test_first_approval_asks_each_approver_in_order():
     nobody = Gateway(OPERATIONS, DEFAULT_RULES, first_approval(no))
     with pytest.raises(ActionRefused):
         run(nobody, "set_pump", speed=10)
+
+
+def test_a_lab_with_malformed_checks_is_closed_and_refused(tmp_path):
+    from inspect_ai import Task, eval
+    from inspect_ai.dataset import Sample
+    from inspect_ai.solver import generate
+
+    from inspect_labs.bindings import LabInfo, connect_lab
+
+    closed = []
+
+    class BadChecksLab:
+        info = LabInfo(name="bad", version="1", mode="computation", capabilities=frozenset())
+        tools: list = []
+        artifacts: list = []
+        checks = "not a list of callables"
+
+        async def observe(self):
+            return {}
+
+        async def close(self):
+            closed.append(True)
+
+    task = connect_lab(
+        Task(dataset=[Sample(input="x")], solver=generate()),
+        lab=lambda state: BadChecksLab(),
+        scorer=lambda report, lab_log: {"known": 1, "correct": 1},
+        requires=frozenset(),
+        lab_log_dir=tmp_path / "lab-logs",
+        rules=DEFAULT_RULES,
+    )
+    (log,) = eval(task, model="mockllm/model", log_dir=str(tmp_path / "logs"), display="none")
+    assert log.status == "error" and "checks must be a list" in log.samples[0].error.message
+    assert closed == [True]

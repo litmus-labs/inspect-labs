@@ -30,6 +30,14 @@ def test_declared_module_inventory_and_dependencies() -> None:
         },
         "journal": {"pydantic"},
         "release": {"pydantic"},
+        "connectors": {
+            "inspect_ai",
+            "pydantic",
+            "mcp",
+            "inspect_labs.actions",
+            "inspect_labs.bindings",
+            "inspect_labs.spec",
+        },
         "operators": {"anyio", "pydantic", "inspect_labs.actions", "inspect_labs.gateway"},
         "serve": {
             "anyio",
@@ -104,6 +112,7 @@ def test_declared_module_inventory_and_dependencies() -> None:
             "inspect_labs.journal",
             "inspect_labs.operators",
             "inspect_labs.release",
+            "inspect_labs.connectors",
             "inspect_labs.serve",
             "pydantic",
             "anyio",

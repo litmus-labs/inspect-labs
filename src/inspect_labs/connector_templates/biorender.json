@@ -1,0 +1,32 @@
+{
+  "connector": "biorender",
+  "server": {
+    "url": "https://mcp.services.biorender.com/mcp"
+  },
+  "source": "https://claude.com/connectors/biorender",
+  "confirmed": "directory listing only, not tools/list; unconfirmed",
+  "notes": "Needs OAuth sign-in, which Inspect Labs connectors don't support yet. Tool names unconfirmed.",
+  "tools": {
+    "search-biorender": {
+      "action": "read"
+    },
+    "custom-figure-get-session": {
+      "action": "read"
+    },
+    "custom-figure-get-preview-job": {
+      "action": "read"
+    },
+    "render-figure": {
+      "action": "reversible",
+      "note": "Creates content in the account"
+    },
+    "custom-figure-create-session": {
+      "action": "reversible",
+      "note": "Creates content in the account"
+    },
+    "custom-figure-confirm-preview": {
+      "action": "reversible",
+      "note": "Creates content in the account"
+    }
+  }
+}
