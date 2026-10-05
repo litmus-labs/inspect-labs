@@ -1,0 +1,33 @@
+name: PR description
+
+# Checks a pull request's title and description against the pull request template.
+#
+# pull_request_target runs this workflow file and the checker from the base branch,
+# so a pull request can't change its own check. It is safe here because the job never
+# checks out or runs the pull request's code: it only reads the title and description
+# from the event file, with read-only permissions and no secrets.
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-description-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  description:
+    name: PR description
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          sparse-checkout: scripts/check-pr-description.py
+          sparse-checkout-cone-mode: false
+      - name: Check the title and description
+        run: python3 scripts/check-pr-description.py
