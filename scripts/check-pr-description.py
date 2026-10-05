@@ -23,11 +23,6 @@ MAX_PROSE = 1500
 """A little above the template's "about 1,200 characters", so it guides, not nags."""
 GUIDANCE = "Remove this guidance before submitting"
 COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
-# Text a bot inserted between its markers, such as CodeRabbit's summary.
-BOT_BLOCK = re.compile(
-    r"<!-- This is an auto-generated comment:.*?<!-- end of auto-generated comment:.*?-->",
-    re.DOTALL,
-)
 # Lines that aren't prose: images, links on their own, code fences and their contents.
 NOT_PROSE = re.compile(r"^\s*(!\[|<img|https?://\S+$)")
 # Fenced code with backticks or tildes; an unclosed fence runs to the end.
@@ -41,7 +36,7 @@ BLOCK = re.compile(r"^\s{0,3}([-*+]\s|\d+[.)]\s|>|\||#{1,6}\s)")
 
 def prose(body: str) -> str:
     """The description without comments, code blocks, images and bare links."""
-    text = COMMENT.sub("", BOT_BLOCK.sub("", body))
+    text = COMMENT.sub("", body)
     # Fenced code with backticks or tildes; an unclosed fence runs to the end.
     text = re.sub(
         r"^\s{0,3}(`{3,}|~{3,}).*?(^\s{0,3}\1[^\S\n]*$|\Z)",
