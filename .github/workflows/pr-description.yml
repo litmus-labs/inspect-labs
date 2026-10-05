@@ -1,0 +1,39 @@
+name: PR description
+
+# Checks that the pull request description fills in the template's What this does,
+# Why and Verification sections. Reruns when the description is edited.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-description-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  description:
+    name: PR description
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # Use the base branch's checker, so a pull request can't change its own check.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+          sparse-checkout: scripts/check-pr-description.py
+          sparse-checkout-cone-mode: false
+      # Only the pull request that first adds the checker uses its own copy.
+      - name: Use this pull request's checker if the base has none
+        if: hashFiles('scripts/check-pr-description.py') == ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/check-pr-description.py
+          sparse-checkout-cone-mode: false
+      # The description is read from the event file, never interpolated into the script.
+      - name: Check the description
+        run: python3 scripts/check-pr-description.py

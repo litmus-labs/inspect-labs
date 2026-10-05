@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Review a pull request with the Codex CLI and, with --post, comment the findings on it.
+# Review a pull request with the Codex CLI. With --post, comment the findings on it and
+# set the "Codex review" status on its head commit, which main requires before merging:
+# success when Codex reports no P0-P2 findings, failure when it does, error when the
+# review couldn't finish. P3 findings are reported but don't block.
 #
 # Usage: scripts/codex-review-pr.sh PR_NUMBER [--post]
 #
@@ -31,14 +34,30 @@ git -C "$repo_root" worktree add -q --detach "$work/tree" "$head_sha"
 git -C "$work/tree" branch -q -f "$base_branch" "origin/$base"
 
 # Codex reads the "Review guidelines" in AGENTS.md; --base takes no extra prompt.
-(cd "$work/tree" && env -u OPENAI_API_KEY codex review -c forced_login_method='"chatgpt"' --base "$base_branch") > "$work/review.md"
+status=0
+(cd "$work/tree" && env -u OPENAI_API_KEY codex review -c forced_login_method='"chatgpt"' --base "$base_branch") > "$work/review.md" || status=$?
 cat "$work/review.md"
+
+blocking="$(grep -cE '^[[:space:]]*-[[:space:]]*\[P[0-2]\]' "$work/review.md" || true)"
+if (( status != 0 )) || [[ ! -s "$work/review.md" ]]; then
+  state=error; description="The Codex review did not finish; rerun scripts/codex-review-pr.sh"
+elif (( blocking > 0 )); then
+  state=failure; description="$blocking P0-P2 finding(s) to fix; see the Codex review comment"
+else
+  state=success; description="No P0-P2 findings"
+fi
+echo "Codex review: $state ($description)"
 
 if [[ "$post" == "--post" ]]; then
   {
-    echo "### Codex review (CLI, against \`$base\`)"
+    echo "### Codex review (CLI, against \`$base\`, commit \`${head_sha:0:7}\`)"
     echo
     cat "$work/review.md"
   } > "$work/comment.md"
-  gh pr comment "$pr" --body-file "$work/comment.md"
+  comment_url="$(gh pr comment "$pr" --body-file "$work/comment.md")"
+  repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+  gh api -X POST "repos/$repo/statuses/$head_sha" \
+    -f state="$state" -f context="Codex review" \
+    -f description="$description" -f target_url="$comment_url" >/dev/null
 fi
+[[ "$state" == success ]]

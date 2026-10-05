@@ -21,4 +21,4 @@
 ## Review
 
 - [ ] Checked against `.github/REVIEW_GUIDE.md`
-- [ ] Higher-risk change (gateway, lab log, rescoring, serving): run `scripts/codex-review-pr.sh PR --post`
+- [ ] Ran `scripts/codex-review-pr.sh PR --post` and fixed its P0–P2 findings
