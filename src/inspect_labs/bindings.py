@@ -887,6 +887,8 @@ class LabSessionLog(BaseModel):
     samples: dict[str, LabLog]
     """One lab log per session, keyed by session id."""
     flags: list[Flag] = Field(default_factory=list)
+    journal_sha256: str | None = None
+    """The session journal's digest just before the lab log was written, if journaled."""
 
 
 def _check_chains(samples: dict[str, LabLog]) -> None:

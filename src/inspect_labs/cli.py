@@ -38,8 +38,10 @@ from inspect_labs.gateway import (
     first_approval,
     leased_actions,
 )
+from inspect_labs.journal import Journal, check_witness, read_journal, witness_file
 from inspect_labs.liquid_tasks import serial_dilution_outcome, worklist_outcome
-from inspect_labs.monitors import DEFAULT_MONITORS
+from inspect_labs.monitors import DEFAULT_MONITORS, LIVE_MONITORS, repeated_refusals
+from inspect_labs.operators import ApprovalQueue, ControlRequest, send_control
 from inspect_labs.plugins import Kind, available, canonical, resolve
 from inspect_labs.serve import LabSession, serve_over_stdio
 from inspect_labs.tasks import (
@@ -159,6 +161,58 @@ def main() -> None:
         required=True,
         help="Where to write the session's lab log (never overwritten)",
     )
+    serve.add_argument(
+        "--journal",
+        type=Path,
+        help="Where to write each step as it happens (default: the lab log path "
+        "with .journal.jsonl)",
+    )
+    serve.add_argument(
+        "--witness-file",
+        type=Path,
+        help="Also append each journal digest here; keep it where the lab can't rewrite it",
+    )
+    serve.add_argument(
+        "--control-socket",
+        type=Path,
+        help="Private Unix socket for operators to watch, approve and stop the session",
+    )
+    serve.add_argument(
+        "--approval-timeout",
+        type=float,
+        default=300,
+        help="Seconds a held action waits for an operator before it is refused",
+    )
+    serve.add_argument(
+        "--refusal-limit",
+        type=int,
+        help="Stop the session after this many refused actions",
+    )
+    serve.add_argument(
+        "--stop-on",
+        action="append",
+        default=[],
+        metavar="MONITOR",
+        help="Stop the session when this live monitor flags (repeatable)",
+    )
+    operator = commands.add_parser(
+        "operator", help="Watch, approve or stop a served session over its control socket"
+    )
+    operator.add_argument("socket", type=Path, help="The session's control socket")
+    operator.add_argument(
+        "command_name",
+        metavar="action",
+        choices=["status", "pending", "approve", "refuse", "stop"],
+        help="What to do",
+    )
+    operator.add_argument("id", nargs="?", help="The pending action's id (approve, refuse)")
+    operator.add_argument("--by", help="Your name, recorded with the answer")
+    operator.add_argument("--reason", help="Why the session is stopped")
+    journal = commands.add_parser(
+        "journal", help="Check a session journal's digests, and optionally its witness file"
+    )
+    journal.add_argument("path", type=Path, help="The session's .journal.jsonl")
+    journal.add_argument("--witness", type=Path, help="A witness file to compare with")
     monitor = commands.add_parser(
         "monitor", help="Run the default monitors on a saved run and list their flags"
     )
@@ -203,6 +257,42 @@ def main() -> None:
     stdout = sys.stdout
     try:
         with contextlib.redirect_stdout(sys.stderr):
+            if args.command == "operator":
+                try:
+                    reply = send_control(
+                        args.socket,
+                        ControlRequest(
+                            command=args.command_name, id=args.id, by=args.by, reason=args.reason
+                        ),
+                    )
+                except (ValueError, OSError) as exc:
+                    parser.error(f"Cannot reach the session: {type(exc).__name__}: {exc}")
+                print(json.dumps(reply, indent=2), file=stdout)
+                if not reply.get("ok"):
+                    sys.exit(1)
+                return
+            if args.command == "journal":
+                try:
+                    checked = read_journal(args.path)
+                    problems = check_witness(checked, args.witness) if args.witness else []
+                except (ValueError, OSError) as exc:
+                    parser.error(f"Journal check failed: {type(exc).__name__}: {exc}")
+                print(
+                    json.dumps(
+                        {
+                            "entries": len(checked.entries),
+                            "head": checked.head,
+                            "ended": checked.ended,
+                            "torn_tail": checked.torn_tail,
+                            "witness_problems": problems,
+                        },
+                        indent=2,
+                    ),
+                    file=stdout,
+                )
+                if problems:
+                    sys.exit(1)
+                return
             if args.command == "list":
                 kinds: list[Kind] = [canonical(args.kind)] if args.kind else ["lab", "backend"]
                 print(json.dumps({kind: available(kind) for kind in kinds}), file=stdout)
@@ -460,10 +550,33 @@ def _serve(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
                 leases = TypeAdapter(list[Lease]).validate_json(args.leases.read_text())
                 approvers.append(leased_actions(leases))
             approver = first_approval(*approvers) if approvers else None
+            live = list(LIVE_MONITORS)
+            stop_on = set(args.stop_on)
+            if args.refusal_limit is not None:
+                live.append(repeated_refusals(args.refusal_limit))
+                stop_on.add("repeated-refusals")
+            # Without a control channel nobody could answer, so held actions just refuse.
+            queue = ApprovalQueue(args.approval_timeout) if args.control_socket else None
+            if args.lab_log.exists():
+                raise FileExistsError(f"{args.lab_log} already exists")
+            journal_path = args.journal or args.lab_log.with_suffix(".journal.jsonl")
+            journal = Journal(
+                journal_path,
+                witness=witness_file(args.witness_file) if args.witness_file else None,
+            )
         except (LookupError, ValueError, OSError) as exc:
             parser.error(f"Cannot serve: {type(exc).__name__}: {exc}")
-        session = LabSession(lab, rules, approver=approver, stop_file=args.stop_file)
-        log = anyio.run(serve_over_stdio, session, args.lab_log)
+        session = LabSession(
+            lab,
+            rules,
+            approver=approver,
+            stop_file=args.stop_file,
+            queue=queue,
+            journal=journal,
+            live_monitors=live,
+            stop_on=frozenset(stop_on),
+        )
+        log = anyio.run(serve_over_stdio, session, args.lab_log, args.control_socket)
         (record,) = log.samples.values()
         print(
             json.dumps(
@@ -473,6 +586,7 @@ def _serve(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
                     "refused": sum(1 for a in record.actions if a.status == "refused"),
                     "flags": len(log.flags),
                     "stopped": log.stopped,
+                    "journal": str(journal_path),
                 }
             ),
             file=sys.stderr,
