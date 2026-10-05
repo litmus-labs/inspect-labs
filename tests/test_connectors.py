@@ -313,3 +313,48 @@ def test_cli_serves_a_connector_with_a_screener(profile, tmp_path):
 
     refused = anyio.run(scenario)
     assert refused.is_error and "sequence-screen:flagged" in refused.content[0].text
+
+
+def test_an_explicit_null_is_passed_on_and_an_omitted_argument_is_not(profile, tmp_path):
+    served = session(profile, tmp_path)
+    with_null = anyio.run(served.call, "lookup_record", {"query_string": "P1", "class_": None})
+    omitted = anyio.run(served.call, "lookup_record", {"query_string": "P1"})
+    assert with_null == "received class=None, query-string=P1"
+    assert omitted == "received query-string=P1"
+
+
+def test_a_connector_is_refused_without_rules(profile, tmp_path):
+    outputs = [
+        ModelOutput.from_message(
+            ChatMessageAssistant(
+                content="",
+                tool_calls=[
+                    ToolCall(id="c1", function="search_literature", arguments={"query": "GFP"})
+                ],
+            )
+        ),
+        ModelOutput.from_content("mockllm/model", "done"),
+    ]
+    labs = []
+
+    def make(state):
+        labs.append(ConnectorLab(profile, tmp_path / state.uuid))
+        return labs[-1]
+
+    task = connect_lab(
+        Task(dataset=[Sample(input="Find a paper")], solver=generate()),
+        lab=make,
+        scorer=lambda report, lab_log: {"known": 1, "correct": 1},
+        requires=frozenset({"connector:fake-bio"}),
+        lab_log_dir=tmp_path / "lab-logs",
+    )
+    (log,) = eval(
+        task,
+        model=get_model("mockllm/model", custom_outputs=outputs),
+        log_dir=str(tmp_path / "logs"),
+        display="none",
+    )
+    # Its own safety checks need the gateway, so it never runs without rules.
+    assert log.status == "error"
+    assert "own safety checks, which need rules" in log.samples[0].error.message
+    assert all(lab.calls == [] for lab in labs)

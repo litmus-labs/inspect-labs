@@ -237,6 +237,18 @@ Screener = Callable[[str], Awaitable[ScreenVerdict]]
 """Screens one DNA or protein sequence, for example with a synthesis screening tool."""
 
 
+class _Omitted:
+    """Default for an optional argument the agent didn't give, unlike an explicit null."""
+
+    inspect_labs_omitted = True
+    """Tells the gateway wrapper to leave this argument out of the record and the call."""
+
+    def __repr__(self) -> str:
+        return "omitted"
+
+
+OMITTED: Any = _Omitted()
+
 _JSON_TYPES: dict[str, Any] = {
     "string": str,
     "integer": int,
@@ -307,7 +319,7 @@ def _signature(schema: Mapping[str, Any]) -> inspect.Signature:
                 inspect.Parameter(
                     name,
                     inspect.Parameter.KEYWORD_ONLY,
-                    default=None,
+                    default=OMITTED,
                     annotation=annotation | None,
                 )
             )
@@ -448,10 +460,11 @@ class ConnectorLab:
         aliases = _aliases(spec.input_schema)
 
         async def run(**arguments: Any) -> str:
+            # Omitted arguments are left out; an explicit null is passed on as null.
             given = {
                 aliases.get(key, key): value
                 for key, value in arguments.items()
-                if value is not None
+                if value is not OMITTED
             }
             problem: Decision | None = None
             result: Any = None
