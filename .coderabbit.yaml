@@ -18,6 +18,19 @@ reviews:
     - "!site/assets/**"
     - "!uv.lock"
   path_instructions:
+    - path: "**/*"
+      instructions: >-
+        Security review on every change: secrets or credentials, personal data,
+        command or path injection (shell commands, subprocess, file paths from
+        untrusted input), unsafe deserialization, and permissions that are broader
+        than needed. Treat MCP connector results, Lab observations and world logs as
+        untrusted input.
+    - path: ".github/workflows/*.yml"
+      instructions: >-
+        Workflow security: actions pinned to full commit SHAs, least-privilege
+        permissions per job, no untrusted input (pull request titles, branch names,
+        comment bodies) interpolated into run scripts, persist-credentials off where
+        a token isn't needed, and secrets never exposed to forks.
     - path: "src/inspect_labs/{gateway,actions,operators,serve,connectors}.py"
       instructions: >-
         Safety boundary. Check that every tool call passes the Gateway; that refused,
@@ -49,6 +62,32 @@ reviews:
       instructions: >-
         Tests should exercise user, persistence and untrusted-input boundaries and
         assert the failure behavior, not only the happy path.
+  # Security and correctness tools. Ruff is the project's Python linter, so the
+  # overlapping Python linters are off to avoid duplicate comments.
+  tools:
+    gitleaks:
+      enabled: true
+    trufflehog:
+      enabled: true
+    semgrep:
+      enabled: true
+    zizmor:
+      enabled: true
+    actionlint:
+      enabled: true
+    osvScanner:
+      enabled: true
+    presidio:
+      enabled: true
+    shellcheck:
+      enabled: true
+    ruff:
+      enabled: true
+      config_file: pyproject.toml
+    flake8:
+      enabled: false
+    pylint:
+      enabled: false
 chat:
   auto_reply: true
 knowledge_base:
