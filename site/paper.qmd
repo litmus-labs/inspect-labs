@@ -1,0 +1,44 @@
+---
+title: "Inspect Labs: A Framework for Evaluating Autonomous Laboratory Workflows"
+subtitle: "Framework paper · SPAIS 2026 submission"
+description: "The Inspect Labs framework paper and its approach to evaluating AI-operated laboratory workflows."
+toc: false
+---
+
+::: {.callout-warning}
+## Under review
+This is the revised version (October 2, 2026) of the anonymized workshop submission.
+Acceptance has not been established.
+:::
+
+[Open the PDF](assets/inspect-labs-paper.pdf){.btn .btn-primary}
+<a href="assets/inspect-labs-paper.pdf" download class="btn btn-outline-secondary">Download PDF</a>
+
+## Abstract
+
+Model capabilities in biology are accelerating, and scientific AI agents with access
+to biological tools are becoming more integrated into R&D workflows. Ensuring that
+safeguards reliably prevent misuse in practice is an urgent R&D challenge. Recent
+trials even demonstrate agents controlling robots are susceptible to taking misaligned
+actions when adversarially evaluated in the real world. Testing these systems requires
+laboratory environments where agents can use software, services, and laboratory
+instruments, carry out research tasks, and encounter safeguards. Evaluation researchers
+need ways to connect these environments, observe their outcomes, and reuse them across
+studies. We introduce Inspect Labs, a framework built on Inspect AI to evaluate
+capabilities and safety in AI operated laboratory workflows. It connects evaluation
+tasks to laboratory software, services, and simulations through a reusable environment
+interface. Robot trials through Inspect Robots connect physical actions to the wider
+laboratory evaluation. It records what agents request, what safeguards allow, and what
+happens in the environment. Evaluations can be used to check what agents accomplish and
+whether safeguards prevent disallowed work while allowing legitimate research. We
+describe the approach and its early prototype. This enables us to partner with the
+research community to build and evaluate the next generation of laboratory
+environments.
+
+Citations and references are included in the PDF.
+
+## Read the paper
+
+<object class="paper-frame" data="assets/inspect-labs-paper.pdf#view=FitH" type="application/pdf" aria-label="Inspect Labs framework paper (PDF)">
+<p>Your browser cannot display the PDF inline. <a href="assets/inspect-labs-paper.pdf">Open the PDF</a>.</p>
+</object>

@@ -13,7 +13,7 @@ from inspect_ai.tool import Tool, ToolError, tool
 from inspect_ai.util import sandbox
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
-from inspect_labs.bindings import EnvironmentInfo, artifact_digest
+from inspect_labs.bindings import LabInfo, artifact_digest
 from inspect_labs_commec.report import SCREEN_CONFIG, ScreeningResult, interpret_artifacts
 
 Case = Literal[
@@ -178,7 +178,7 @@ class ReviewEnvironment:
         )
         self.case, self.fixture, self.timeout = case, fixture, timeout
         self.directory.mkdir(parents=True, exist_ok=False, mode=0o700)
-        self.info = EnvironmentInfo(
+        self.info = LabInfo(
             name="commec-review",
             version="0.1.0/commec-2.1.0",
             mode="simulation" if fixture else "computation",
@@ -479,7 +479,7 @@ class ReviewEnvironment:
             decisions=self._decisions,
             journal=str(journal.resolve()),
         )
-        # bind_task collects once; repeated read-only observations stay byte-identical.
+        # connect_lab collects once; repeated read-only observations stay byte-identical.
         text = facts.model_dump_json()
         if not journal.exists():
             self._save("workflow.json", text)

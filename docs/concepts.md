@@ -12,14 +12,14 @@ An Inspect Labs evaluation has two inputs you can swap independently:
 
 - **The agent.** A native Inspect model plus solver or agent scaffold. Change the
   model with `--model`, or the scaffold with `--solver`, without touching the task.
-- **The laboratory.** A `LabEnvironment`: a binding to a lab service, instrument or
+- **The laboratory.** A `Lab`: a binding to a lab service, instrument or
   simulator. It gives the agent scoped native tools, gives the evaluator a separate
   read-only `observe()`, declares its capabilities and operations, and owns its
   instrument connection.
 
 | In an Inspect AI evaluation | Inspect Labs adds |
 |---|---|
-| `Task` and `Sample` define the study | `bind_task` connects a task to a `LabEnvironment` |
+| `Task` and `Sample` define the study | `connect_lab` connects a task to a `Lab` |
 | Model or solver uses native tools | Scoped tools call an existing service, instrument or simulator |
 | Native approval controls tool use | Environment admission and provider policies check what may execute |
 | Native scorer and metrics judge a sample | Read-only `observe()` and a task-specific judge use recorded facts |
@@ -33,7 +33,7 @@ judges what that step means for the laboratory task.
 ## Tasks
 
 A task is a native Inspect `Task`: a dataset of samples (instructions and initial
-conditions), a solver, and limits. `bind_task` attaches:
+conditions), a solver, and limits. `connect_lab` attaches:
 
 - a **setup** step that builds the environment for each sample, checks compatibility
   and physical authorization, and only then gives the agent its tools;
@@ -46,7 +46,7 @@ another `--model` still sets up, observes and scores.
 
 ## Environments
 
-A `LabEnvironment` declares:
+A `Lab` declares:
 
 | Member | Purpose |
 |---|---|
@@ -101,7 +101,7 @@ private `.labs` companion when evidence collection completes. An interrupted run
 may lack that companion and cannot be rescored until its evidence is recovered.
 A log whose samples were all refused before dispatch has none. The companion holds the observations,
 environment declarations, declared metrics, and hashes of the native log and every
-supporting artifact. `rescore_workflow` replays a judge against that evidence without
+supporting artifact. `rescore` replays a judge against that evidence without
 constructing an environment, calling a model or dispatching anything. Samples that
 errored in the native run stay unscored in replay, exactly as recorded. Samples
 refused before dispatch (incompatible or latched) have no evidence and must have

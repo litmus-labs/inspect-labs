@@ -19,7 +19,7 @@ Install and run from the repository with Python 3.12 or newer:
 umask 077
 python -m pip install . ./plugins/inspect-labs-plate-reader
 inspect-labs list
-inspect-labs doctor --environment plate-reader-qc
+inspect-labs doctor --lab plate-reader-qc
 inspect eval inspect_labs_plate_reader/absorbance_qc \
   -T scripted=true --model mockllm/model \
   -T evidence_dir=.research/plate-reader-evidence \

@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling>=1.25,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "inspect-labs-sila"
+version = "0.1.0.dev0"
+description = "A Lab backed by a mock SiLA 2 instrument, for native Inspect evaluations"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = ["inspect-labs", "sila2>=0.14,<0.15"]
+
+[project.entry-points.inspect_ai]
+inspect_labs_sila = "inspect_labs_sila.tasks"
+
+[project.entry-points."inspect_labs.labs"]
+sila-mock-reader = "inspect_labs_sila.lab:sila_mock_reader"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/inspect_labs_sila"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "LICENSE", "pyproject.toml"]

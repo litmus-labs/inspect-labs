@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, JsonValue
 from pylabrobot.plate_reading import PlateReader, PlateReaderChatterboxBackend
 from pylabrobot.resources import cor_96_wellplate_360uL_Fb
 
-from inspect_labs.bindings import EnvironmentInfo
+from inspect_labs.bindings import LabInfo
 
 Case = Literal["passing", "high_blank", "low_control"]
 SEEDS: dict[Case, tuple[float, float, float]] = {
@@ -48,7 +48,7 @@ class PlateReaderEnvironment:
     to measure again. The Chatterbox values are explicitly seeded test inputs.
     """
 
-    info = EnvironmentInfo(
+    info = LabInfo(
         name="pylabrobot-plate-reader-qc",
         version="1",
         mode="simulation",

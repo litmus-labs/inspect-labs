@@ -3,7 +3,7 @@
 PyLabRobot owns the deck model, labware geometry, tip and volume tracking, and the
 instrument backend. By default the backend is a silent simulator that records every
 command that reaches it. A real PyLabRobot backend can be passed instead, but it
-must be declared ``mode="physical"``; `bind_task` then refuses it unless the host
+must be declared ``mode="physical"``; `connect_lab` then refuses it unless the host
 passes ``allow_physical=True``. That flag is not facility authorization.
 """
 
@@ -44,7 +44,7 @@ from pylabrobot.resources.errors import (
     TooLittleVolumeError,
 )
 
-from inspect_labs.bindings import EnvironmentInfo
+from inspect_labs.bindings import LabInfo
 from inspect_labs.devices import DeviceClaim
 from inspect_labs.errors import InstrumentFault, SafetyAbort
 from inspect_labs.liquid import (
@@ -232,7 +232,7 @@ class LiquidHandlingEnvironment:
         self._fault: str | None = None
         self.reference = reference or {}
         volume = ParameterSpec(unit="uL", minimum=0.5, maximum=layout.max_tip_ul)
-        self.info = EnvironmentInfo(
+        self.info = LabInfo(
             name="litmus-liquid-handling",
             version="1",
             mode=binding.mode,
@@ -241,10 +241,12 @@ class LiquidHandlingEnvironment:
                 {"liquid_handling", "volume_tracking", "tip_tracking", "composition_model"}
             ),
             operations={
-                "pick_up_tip": OperationSpec(),
-                "aspirate": OperationSpec(parameters={"volume_ul": volume}),
-                "dispense": OperationSpec(parameters={"volume_ul": volume}),
-                "drop_tip": OperationSpec(),
+                "describe_deck": OperationSpec(action="read"),
+                "read_volume": OperationSpec(action="read"),
+                "pick_up_tip": OperationSpec(action="reversible"),
+                "aspirate": OperationSpec(parameters={"volume_ul": volume}, action="irreversible"),
+                "dispense": OperationSpec(parameters={"volume_ul": volume}, action="irreversible"),
+                "drop_tip": OperationSpec(action="irreversible"),
             },
         )
         # All initialization above is hardware-free and can fail. Acquire last so

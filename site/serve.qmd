@@ -1,0 +1,79 @@
+---
+title: "Serve a Lab to an agent"
+description: "Let any MCP agent use a Lab's tools, with every action checked, approved and recorded by the same rules as your evaluations."
+---
+
+Evaluations test what an agent does in a Lab. Serving a Lab lets an agent use it
+outside an evaluation, with the same safeguards. Every tool call goes through the
+**gateway**: it is checked against your rules, held for approval if needed, and
+recorded, before it reaches the Lab. The same rule file decides the same way in an
+evaluation and when served.
+
+::: {.callout-warning}
+## Prototype
+Serving has been tested with simulated and mock Labs only. It has not been used with
+real instruments, and it is not a substitute for facility safety controls.
+:::
+
+## Serve a Lab
+
+Install the optional extra, then serve a registered Lab over MCP's stdio transport:
+
+```bash
+uv pip install --python .venv/bin/python '.[serve]'
+inspect-labs serve --lab liquid-handler \
+  --rules rules.json --approvals approvals.json \
+  --stop-file .research/STOP --lab-log .research/session.json
+```
+
+| Option | What it does |
+|---|---|
+| `--lab` | A registered Lab (see `inspect-labs list`) |
+| `--rules` | Action rules as JSON. Without it, the default rules allow reads and reversible actions and hold irreversible and external actions for approval. |
+| `--approvals` | Actions a person approved in advance, as a JSON list of `{"tool": ..., "arguments": {...}}`. A held action runs only if it matches one exactly. |
+| `--stop-file` | Stop the session when this file appears. Every later action is refused, and the file's text is recorded as the reason. |
+| `--lab-log` | Where to write the session's lab log when the agent disconnects. It is never overwritten. |
+
+Point any MCP agent at the command. For example, in an MCP client configuration:
+
+```json
+{
+  "mcpServers": {
+    "lab": {
+      "command": "inspect-labs",
+      "args": ["serve", "--lab", "liquid-handler", "--lab-log", "session.json"]
+    }
+  }
+}
+```
+
+The agent sees the Lab's tools. A refused action comes back as an error with the
+reason, and never reaches the Lab. The agent cannot stop or reconfigure the gateway.
+
+## After the session
+
+The session's lab log records every action, the decision, any approval and whether
+it ran, then what the Lab reported. It is hash-chained like an evaluation's lab log,
+and includes monitor flags such as refused actions.
+
+```bash
+inspect-labs replay-rules .research/session.json --rules new-rules.json
+```
+
+Replaying rules works the same on a session's lab log as on an evaluation's: it shows
+what the new rules would have decided, without running anything.
+
+## From Python
+
+```python
+from inspect_labs import DEFAULT_RULES
+from inspect_labs.gateway import ApprovedAction, approved_actions
+from inspect_labs.serve import LabSession, serve_over_stdio
+
+session = LabSession(
+    my_lab,
+    DEFAULT_RULES,
+    approver=approved_actions([ApprovedAction(tool="drop_tip", arguments={})]),
+)
+# session.stop("reason") refuses every later action.
+```

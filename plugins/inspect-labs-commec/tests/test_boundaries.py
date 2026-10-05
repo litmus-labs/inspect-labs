@@ -18,11 +18,11 @@ from inspect_labs_commec.report import SCREEN_CONFIG, interpret_artifacts
 from inspect_labs_commec.tasks import review_outcome
 from test_report import LOG, REVISIONS, native_report
 
-from inspect_labs.bindings import ArtifactLink, LabEvidence
+from inspect_labs.bindings import ArtifactLink, LabLog
 
 
 def evidence(env, facts):
-    return LabEvidence(
+    return LabLog(
         sample_uuid="s",
         environment=env.info,
         collected_at="test",

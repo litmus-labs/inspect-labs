@@ -17,7 +17,7 @@ From the Inspect Labs checkout, with Python 3.12 or newer:
 umask 077
 python -m pip install . ./plugins/inspect-labs-commec
 inspect-labs list
-inspect-labs doctor --environment commec-review
+inspect-labs doctor --lab commec-review
 inspect eval inspect_labs_commec/screening_review \
   -T fixture=true -T scripted=true --model mockllm/model \
   -T evidence_dir=.research/commec-evidence --log-dir .research/commec-logs

@@ -36,7 +36,7 @@ def test_cli_run_and_rescore(tmp_path: Path) -> None:
         text=True,
         check=True,
     )
-    assert json.loads(result.stdout)["new_submissions"] == 0
+    assert json.loads(result.stdout)["replay_only"] is True
 
 
 @pytest.mark.parametrize(
@@ -136,3 +136,80 @@ def test_cli_cost_flags_rejected_for_non_live_runs(tmp_path: Path, flags: list[s
     assert result.returncode == 2
     assert "only to live model runs" in result.stderr
     assert not list(tmp_path.iterdir())
+
+
+def _custom_run(tmp_path: Path) -> tuple[Path, Path]:
+    pytest.importorskip("pylabrobot")
+    import importlib.util
+
+    from inspect_ai import eval
+
+    example = Path(__file__).resolve().parents[1] / "examples" / "reagent_addition.py"
+    spec = importlib.util.spec_from_file_location("reagent_addition_cli", example)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    task = module.reagent_addition(columns=3, scripted=True, evidence_dir=str(tmp_path / "e"))
+    log = eval(task, model="mockllm/model", log_dir=str(tmp_path / "logs"), display="none")[0]
+    native = Path(log.location)
+    return native, native.with_suffix(".labs")
+
+
+def _rescore(native: Path, evidence: Path, output: Path, *extra: str):
+    return subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "inspect_labs.cli",
+            "rescore",
+            str(native),
+            "--evidence",
+            str(evidence),
+            "--output",
+            str(output),
+            *extra,
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_cli_rescores_a_custom_task_with_an_explicit_scorer(tmp_path: Path) -> None:
+    from inspect_ai.log import read_eval_log
+
+    native, evidence = _custom_run(tmp_path)
+    example = Path(__file__).resolve().parents[1] / "examples" / "reagent_addition.py"
+    missing = _rescore(native, evidence, tmp_path / "a.eval")
+    assert missing.returncode == 2 and "--scorer FILE.py:function" in missing.stderr
+    legacy = _rescore(
+        native, evidence, tmp_path / "legacy.eval", "--judge", f"{example}:reagent_outcome"
+    )
+    assert legacy.returncode == 0, legacy.stderr
+    result = _rescore(
+        native, evidence, tmp_path / "b.eval", "--scorer", f"{example}:reagent_outcome"
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {
+        "native_log": str(tmp_path / "b.eval"),
+        "status": "success",
+        "replay_only": True,
+    }
+    assert (
+        read_eval_log(str(tmp_path / "b.eval")).samples[0].scores
+        == read_eval_log(str(native)).samples[0].scores
+    )
+
+
+@pytest.mark.parametrize(
+    ("spec", "message"),
+    [
+        ("no-colon", "FILE.py:function or module:function"),
+        ("missing_file.py:judge", "Judge file not found"),
+        ("not_a_real_module_xyz:judge", "Cannot import judge module"),
+        ("json:not_there", "is not a callable judge"),
+    ],
+)
+def test_cli_judge_errors_are_clear(tmp_path: Path, spec: str, message: str) -> None:
+    native, evidence = _custom_run(tmp_path)
+    result = _rescore(native, evidence, tmp_path / "x.eval", "--scorer", spec)
+    assert result.returncode == 2 and message in result.stderr
+    assert "Traceback" not in result.stderr

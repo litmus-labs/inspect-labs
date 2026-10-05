@@ -34,7 +34,7 @@ from inspect_robots.errors import SafetyAbort as NativeSafetyAbort
 from inspect_robots.registry import resolve as robots_resolve
 from pydantic import JsonValue
 
-from inspect_labs.bindings import EnvironmentInfo
+from inspect_labs.bindings import LabInfo
 from inspect_labs.devices import DeviceClaim
 from inspect_labs.errors import CompatibilityError, InstrumentFault, SafetyAbort
 
@@ -144,7 +144,7 @@ class RobotStepEnvironment:
                     "physical mode requires explicit host authorization and claimed native "
                     "DEVICE_SLOTS; this embodiment has no claimable device identities"
                 )
-            self.info = EnvironmentInfo(
+            self.info = LabInfo(
                 name=f"inspect-robots:{body.name}",
                 version=str(body.environment_revision or "unversioned"),
                 mode="simulation" if body.is_simulated else "physical",

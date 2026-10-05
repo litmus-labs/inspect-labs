@@ -15,7 +15,7 @@ dependencies = ["inspect-labs[pylabrobot]"]
 [project.entry-points.inspect_ai]
 inspect_labs_plate_reader = "inspect_labs_plate_reader.tasks"
 
-[project.entry-points."inspect_labs.environments"]
+[project.entry-points."inspect_labs.labs"]
 plate-reader-qc = "inspect_labs_plate_reader.environment:plate_reader_environment"
 
 [project.scripts]

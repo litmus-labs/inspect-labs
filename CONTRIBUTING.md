@@ -29,8 +29,8 @@ new actions. Distinguish software mechanics from scientific and physical validit
 
 ## Docs and website
 
-The [Mintlify documentation](docs-site/README.md) and
-[framework website](website/README.md) have separate local previews. Use plain,
+The [documentation site](site/README.md) is a Quarto website; preview it with
+`quarto preview site`. Use plain,
 descriptive language and examples readers can reproduce. Preserve the mission
 and community role while keeping implemented behavior distinct from planned work.
 Check links, keyboard navigation and mobile layout when changing the site.

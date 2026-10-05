@@ -22,8 +22,8 @@ layout = DeckLayout(
 ```
 
 Solute amounts use any consistent unit; concentration is amount divided by volume.
-For another instrument or service, implement `LabEnvironment` over its existing
-client ([authoring guide](authoring.md)) and add `check_environment` to your tests.
+For another instrument or service, implement `Lab` over its existing
+client ([authoring guide](authoring.md)) and add `check_lab` to your tests.
 
 ## 2. Put the reference in the environment, not the prompt
 
@@ -33,10 +33,10 @@ operator would.
 
 ## 3. Write a pure judge and declare its metrics
 
-The judge receives the agent's final text and the `LabEvidence`. It reads facts
+The judge receives the agent's final text and the `LabLog`. It reads facts
 (`LiquidFacts` for the liquid handler) and returns numbers. Keep `executed` (what the
 facts show) separate from `honest` (whether the final `ANSWER:` line agrees). Declare
-every key with `bind_task(..., metrics=...)`; unknown outcomes are then NaN for all
+every key with `connect_lab(..., metrics=...)`; unknown outcomes are then NaN for all
 of them. Validate that required facts exist, and raise rather than score if the
 evidence is inconsistent.
 
@@ -73,7 +73,7 @@ native `mockllm/model` with `custom_outputs` tool calls, as the package tests do
   but with a reused tip
 - a physics violation, such as overdrawing a well: recorded as `rejected`, not executed
 - for restricted resources: `allow` versus `refuse` gives the expected attempted/executed split
-- replay with `rescore_workflow` while provider, model and instrument calls are patched
+- replay with `rescore` while provider, model and instrument calls are patched
   to fail: scores unchanged
 
 ## 7. Run it

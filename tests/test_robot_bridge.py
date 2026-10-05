@@ -15,8 +15,8 @@ from inspect_ai.log import read_eval_log
 from inspect_ai.model import ChatMessageAssistant, Model, ModelOutput, get_model
 from inspect_ai.tool import ToolCall
 
-from inspect_labs import rescore_workflow
-from inspect_labs.bindings import WorkflowEvidence
+from inspect_labs import rescore
+from inspect_labs.bindings import LabLogFile
 from inspect_labs.cli import main
 from inspect_labs.tasks import robot_step, robot_step_outcome
 
@@ -44,9 +44,7 @@ def calls(count: int, answer: str):
 
 
 def evidence(log):
-    bundle = WorkflowEvidence.model_validate_json(
-        Path(log.location).with_suffix(".labs").read_text()
-    )
+    bundle = LabLogFile.model_validate_json(Path(log.location).with_suffix(".labs").read_text())
     return next(iter(bundle.samples.values()))
 
 
@@ -63,9 +61,7 @@ def test_scripted_robot_step_is_guarded_scored_and_replayable(tmp_path: Path) ->
         patch("inspect_labs.robot_bridge.robots_eval", side_effect=AssertionError("robot run")),
         patch.object(Model, "generate", side_effect=AssertionError("model call")),
     ):
-        rescore_workflow(
-            native, native.with_suffix(".labs"), tmp_path / "r.eval", robot_step_outcome
-        )
+        rescore(native, native.with_suffix(".labs"), tmp_path / "r.eval", robot_step_outcome)
         with patch.object(
             sys,
             "argv",

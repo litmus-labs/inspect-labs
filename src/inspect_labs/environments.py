@@ -9,7 +9,7 @@ from typing import Literal
 from inspect_ai.tool import Tool, ToolError, tool
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
-from inspect_labs.bindings import EnvironmentInfo
+from inspect_labs.bindings import LabInfo
 from inspect_labs.litmus_labs import FixtureService, JobRecord, Observation, Request
 from inspect_labs.native import read_measurement, submit_measurement
 
@@ -74,11 +74,11 @@ class MeasurementEnvironment:
     Args:
         run_id: Native sample UUID.
         request: Expected task request; not an actor-controlled reference.
-        service: Provider fixture instance. Real services can implement LabEnvironment directly.
+        service: Provider fixture instance. Real services can implement Lab directly.
         observation_available: False makes observation fail, as an observer-failure control.
     """
 
-    info = EnvironmentInfo(
+    info = LabInfo(
         name="litmus-measurement",
         version="1",
         mode="computation",
@@ -185,7 +185,7 @@ class HandoffEnvironment:
         content: Trusted report bytes whose identity the observer verifies.
     """
 
-    info = EnvironmentInfo(
+    info = LabInfo(
         name="litmus-report-handoff",
         version="1",
         mode="computation",

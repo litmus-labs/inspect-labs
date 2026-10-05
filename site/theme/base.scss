@@ -1,0 +1,93 @@
+/*-- scss:defaults --*/
+$font-family-sans-serif: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !default;
+$font-family-monospace: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace !default;
+$font-size-root: 16px !default;
+$line-height-base: 1.65 !default;
+$headings-font-weight: 600 !default;
+$border-radius: 8px !default;
+$border-radius-lg: 12px !default;
+$code-block-border-left: false !default;
+$callout-border-width: 1px !default;
+
+/*-- scss:rules --*/
+// Shared rules. Color comes only from the theme layers.
+body { font-feature-settings: "cv11", "ss01"; -webkit-font-smoothing: antialiased; }
+h1, h2, h3, h4 { letter-spacing: -0.015em; }
+.title { font-size: 2.1rem; letter-spacing: -0.025em; }
+main h2 { margin-top: 2.5rem; padding-bottom: 0; border-bottom: none; }
+main h3 { margin-top: 1.75rem; }
+
+// Code: 12px radii and thin borders, as in Mintlify.
+div.sourceCode, pre.sourceCode, .cell-output pre {
+  border-radius: $border-radius-lg; border: 1px solid var(--il-border);
+}
+div.sourceCode { margin: 1.25rem 0; }
+pre > code.sourceCode { font-size: 0.86rem; line-height: 1.6; }
+:not(pre) > code:not(.sourceCode) {
+  font-size: 0.86em; padding: 0.12em 0.36em; border-radius: 6px;
+  border: 1px solid var(--il-border); background: var(--il-sunk); color: var(--il-ink);
+}
+
+// Tables
+.table-scroll { overflow-x: auto; margin: 1.25rem 0; }
+.table-scroll > table { margin: 0; }
+.table-scroll .state { white-space: nowrap; }
+.table { font-size: 0.93rem; }
+.table > :not(caption) > * > * { padding: 0.65rem 0.75rem; }
+.table thead th { font-weight: 600; color: var(--il-ink); border-bottom-color: var(--il-border-strong); }
+.table caption { color: var(--il-ink-3); font-size: 0.85rem; caption-side: bottom; text-align: left; }
+
+// Callouts: quiet panels with a colored rule, not saturated boxes.
+div.callout { border-radius: $border-radius-lg; border: 1px solid var(--il-border) !important; border-left-width: 3px !important; background: var(--il-panel); }
+div.callout .callout-header { background: transparent !important; border: none; }
+
+// Navbar and sidebar
+.navbar { border-bottom: 1px solid var(--il-border); box-shadow: none; }
+.navbar-brand .navbar-title { font-weight: 600; letter-spacing: -0.01em; }
+.navbar-logo { height: 26px; width: 26px; max-height: none; }
+.nav-link.active, .sidebar-item .active { color: var(--il-accent) !important; }
+.sidebar nav[role="doc-toc"] ul > li > a.active { border-left-color: var(--il-accent); color: var(--il-accent); }
+.sidebar-item-section > .sidebar-item-container .menu-text {
+  font-size: 0.74rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--il-ink-3);
+}
+#quarto-sidebar { border-right: 1px solid var(--il-border); }
+
+// Evidence states: always a text label in a tinted chip; never color alone.
+.state {
+  display: inline-flex; align-items: center; gap: 0.4em; white-space: nowrap;
+  font: 500 0.78rem/1.4 $font-family-monospace; padding: 0.15em 0.55em;
+  border-radius: 999px; border: 1px solid currentColor;
+}
+.state::before { content: ""; width: 0.5em; height: 0.5em; border-radius: 50%; background: currentColor; }
+.state.observed { color: var(--il-observed); }
+.state.refused { color: var(--il-refused); }
+.state.unknown { color: var(--il-unknown); }
+.state.unknown::before { background: transparent; border: 1.5px solid currentColor; }
+.state.neutral { color: var(--il-ink-2); }
+
+// Homepage
+.lede { font-size: 1.15rem; color: var(--il-ink-2); max-width: 40em; }
+.flow { list-style: none; padding: 0; margin: 1.5rem 0 0.5rem; display: grid; gap: 0.5rem; counter-reset: flow; }
+.flow li {
+  display: grid; grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); gap: 0.25rem 1rem;
+  padding: 0.75rem 1rem; border: 1px solid var(--il-border); border-radius: $border-radius-lg; background: var(--il-panel);
+}
+.flow strong { color: var(--il-ink); font-weight: 600; }
+.flow .owner { display: block; font: 400 0.75rem/1.5 $font-family-monospace; color: var(--il-ink-3); }
+.flow span { color: var(--il-ink-2); }
+@media (max-width: 640px) { .flow li { grid-template-columns: minmax(0, 1fr); } }
+.figure-caption, figcaption { color: var(--il-ink-3); font-size: 0.85rem; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 0.75rem; margin: 1.25rem 0; }
+.cards a {
+  display: block; padding: 1rem 1.1rem; border: 1px solid var(--il-border); border-radius: $border-radius-lg;
+  background: var(--il-panel); text-decoration: none; color: var(--il-ink-2); font-size: 0.92rem;
+}
+.cards a:hover, .cards a:focus-visible { border-color: var(--il-accent); }
+.cards a strong { display: block; color: var(--il-ink); font-weight: 600; margin-bottom: 0.25rem; }
+
+// Paper
+.paper-frame { width: 100%; height: min(80vh, 1100px); border: 1px solid var(--il-border); border-radius: $border-radius-lg; background: #fff; }
+@media (max-width: 768px) { .paper-frame { display: none; } }
+
+:focus-visible { outline: 2px solid var(--il-accent); outline-offset: 2px; }
