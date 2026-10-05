@@ -27,6 +27,26 @@ completion, a cancellation acknowledgement does not establish stopping, and an
 agent report does not establish a laboratory outcome. Rescoring must dispatch no
 new actions. Distinguish software mechanics from scientific and physical validity.
 
+## Checks and reviews
+
+Every pull request runs CI: lint and strict types, tests, the installed-package
+check and the documentation site. All four must pass before merge. Site changes
+also get a Vercel preview link.
+
+Reviews are layered so each catches different problems. All of them check
+[the review guide](.github/REVIEW_GUIDE.md).
+
+| Reviewer | When | Why |
+|---|---|---|
+| Greptile | Every pull request, automatically | Reads the whole codebase, so it catches changes that break code elsewhere |
+| Claude | Code pull requests when opened; `@claude` to ask again | Checks the review guide's rules line by line |
+| Codex | Comment `@codex review` on higher-risk changes | An independent second opinion from a different model |
+| A maintainer | Every pull request | Decides; automated reviews advise |
+
+Higher-risk changes are those touching the gateway, action rules, lab logs and
+their hashes, rescoring, serving, or anything a partner Lab depends on. After you
+push fixes, resolve each review conversation or reply with why it doesn't apply.
+
 ## Docs and website
 
 The [documentation site](site/README.md) is a Quarto website; preview it with
