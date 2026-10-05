@@ -32,6 +32,11 @@
       "merge_system_rule": true
     },
     {
+      "path": "plugins/*/tests/**",
+      "rule": "Instrument and partner adapters. Simulated results must never be presented as real-instrument or physical-safety evidence. Ground truth must stay out of what the agent sees. No partner code may be copied; partner projects are imported from pinned checkouts and instrument libraries used through their public APIs. Tests should exercise user, persistence and untrusted-input boundaries and assert the failure behavior, not only the happy path. Also check security: secrets or credentials, personal data, command or path injection, unsafe deserialization, permissions broader than needed, and private evaluation answers or .research content in public files.",
+      "merge_system_rule": true
+    },
+    {
       "path": "plugins/**",
       "rule": "Instrument and partner adapters. Simulated results must never be presented as real-instrument or physical-safety evidence. Ground truth must stay out of what the agent sees. No partner code may be copied; partner projects are imported from pinned checkouts and instrument libraries used through their public APIs. Also check security: secrets or credentials, personal data, command or path injection, unsafe deserialization, permissions broader than needed, and private evaluation answers or .research content in public files.",
       "merge_system_rule": true
