@@ -38,7 +38,9 @@ status=0
 (cd "$work/tree" && env -u OPENAI_API_KEY codex review -c forced_login_method='"chatgpt"' --base "$base_branch") > "$work/review.md" || status=$?
 cat "$work/review.md"
 
-blocking="$(grep -cE '^[[:space:]]*-[[:space:]]*\[P[0-2]\]' "$work/review.md" || true)"
+# Count P0-P2 findings whether Codex prints them as Markdown bullets ("- [P1] ...")
+# or as JSON ("title": "[P1] ..."), so a format change can't turn the gate green.
+blocking="$(grep -cE '(^[[:space:]]*-[[:space:]]*|"title"[[:space:]]*:[[:space:]]*")\[P[0-2]\]' "$work/review.md" || true)"
 if (( status != 0 )) || [[ ! -s "$work/review.md" ]]; then
   state=error; description="The Codex review did not finish; rerun scripts/codex-review-pr.sh"
 elif (( blocking > 0 )); then
