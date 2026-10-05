@@ -37,7 +37,7 @@ Every pull request must pass these checks before it can merge into `main`:
 | `test` | The test suite, including partner Labs |
 | `Installed packages` | Wheels build, install outside the checkout and run |
 | `Documentation site` | The site renders with no broken links |
-| `PR description` | The description fills in What this does, Why and Verification |
+| `PR description` | A `type(scope): outcome` title and a short plain-paragraph description, as the template asks |
 | `Codex review` | A Codex review of the latest commit found no P0–P2 problems |
 
 The branch must also be up to date with `main`, and every review conversation must be

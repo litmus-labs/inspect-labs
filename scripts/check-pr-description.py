@@ -1,12 +1,12 @@
-"""Check that a pull request description fills in the template's key sections.
+"""Check a pull request's title and description against the pull request template.
 
 Reads the pull request event that GitHub Actions provides (GITHUB_EVENT_PATH), so
-the description is never interpolated into a shell command. Passes for bots such as
-Dependabot, whose descriptions are generated.
+the title and description are never interpolated into a shell command. Passes for
+bots such as Dependabot, whose titles and descriptions are generated.
 
-A section counts as filled in when it has text beyond the template's placeholders:
-HTML comments, a lone "-" and unchecked template boxes don't count. Verification
-needs at least one checked box or a line describing what was run.
+The template (.github/pull_request_template.md) asks for a ``type(scope): outcome``
+title of at most 75 characters, and a short description in plain paragraphs: the
+problem and outcome, then the main changes, optionally verification and risks.
 """
 
 from __future__ import annotations
@@ -16,41 +16,42 @@ import os
 import re
 import sys
 
-REQUIRED = ("What this does", "Why", "Verification")
+TYPES = ("feat", "fix", "docs", "test", "refactor", "ci", "build", "chore", "security")
+TITLE = re.compile(rf"^(?:{'|'.join(TYPES)})(?:\([a-z0-9][a-z0-9-]*\))?!?: \S.*$")
+MAX_TITLE = 75
+MAX_PROSE = 1500
+"""A little above the template's "about 1,200 characters", so it guides, not nags."""
+GUIDANCE = "Remove this guidance before submitting"
 COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
-UNCHECKED = re.compile(r"^\s*[-*]\s*\[ \]")
+# Lines that aren't prose: images, links on their own, code fences and their contents.
+NOT_PROSE = re.compile(r"^\s*(!\[|<img|https?://\S+$)")
 
 
-def sections(body: str) -> dict[str, list[str]]:
-    """Map each level-2 heading to the meaningful lines under it."""
-    found: dict[str, list[str]] = {}
-    current: str | None = None
-    for line in COMMENT.sub("", body).splitlines():
-        heading = re.match(r"^##\s+(.+?)\s*$", line)
-        if heading:
-            current = heading.group(1)
-            found.setdefault(current, [])
-        elif current is not None and line.strip() and line.strip() != "-":
-            found[current].append(line)
-    return found
+def prose(body: str) -> str:
+    """The description without comments, code blocks, images and bare links."""
+    text = COMMENT.sub("", body)
+    text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+    return "\n".join(line for line in text.splitlines() if not NOT_PROSE.match(line)).strip()
 
 
-def problems(body: str) -> list[str]:
-    """Each way the description falls short; empty when it is complete."""
-    found = sections(body or "")
+def problems(title: str, body: str) -> list[str]:
+    """Each way the title or description falls short; empty when both are fine."""
     issues = []
-    for name in REQUIRED:
-        lines = found.get(name)
-        if lines is None:
-            issues.append(f"missing the '## {name}' section")
-            continue
-        meaningful = [line for line in lines if not UNCHECKED.match(line)]
-        if not meaningful:
-            issues.append(
-                "'## Verification' needs a checked box or a line on what was run"
-                if name == "Verification"
-                else f"'## {name}' is empty"
-            )
+    title = title.strip()
+    if not TITLE.match(title):
+        issues.append(f"title should look like 'type(scope): outcome' with a type from {TYPES}")
+    if len(title) > MAX_TITLE:
+        issues.append(f"title is {len(title)} characters; keep it to {MAX_TITLE}")
+    if GUIDANCE in (body or ""):
+        issues.append("description still contains the template's guidance comment")
+    text = prose(body or "")
+    paragraphs = [p for p in re.split(r"\n\s*\n", text) if p.strip()]
+    if len(paragraphs) < 2:
+        issues.append(
+            "description needs at least two paragraphs: the problem and outcome, then the changes"
+        )
+    if len(text) > MAX_PROSE:
+        issues.append(f"description has {len(text)} characters of prose; aim for about 1,200")
     return issues
 
 
@@ -59,17 +60,16 @@ def main() -> int:
     with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as stream:
         event = json.load(stream)
     pull = event.get("pull_request") or {}
-    author = (pull.get("user") or {}).get("type")
-    if author == "Bot":
-        print("Generated description from a bot; not checked.")
+    if (pull.get("user") or {}).get("type") == "Bot":
+        print("Generated title and description from a bot; not checked.")
         return 0
-    issues = problems(pull.get("body") or "")
+    issues = problems(pull.get("title") or "", pull.get("body") or "")
     for issue in issues:
-        print(f"::error title=PR description::The description is {issue}.")
+        print(f"::error title=PR description::The {issue}.")
     if issues:
-        print("Fill in the pull request template (.github/pull_request_template.md).")
+        print("See .github/pull_request_template.md.")
         return 1
-    print("The description fills in What this does, Why and Verification.")
+    print("The title and description follow the template.")
     return 0
 
 
