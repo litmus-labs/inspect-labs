@@ -54,6 +54,11 @@ an action type. Review it before use:
 inspect-labs serve --connector connectors/pubmed.json --lab-log .research/pubmed-session.json
 ```
 
+For a connector with sequence arguments, add `--screener my_screen.py:screen`: an
+async function that takes one sequence and returns a `ScreenVerdict`, for example a
+wrapper around your synthesis screening tool. Without one, calls carrying sequences
+are refused.
+
 In an evaluation, use `ConnectorLab(profile, directory)` as the Lab in
 `connect_lab`. The default rules apply as for any Lab: reads run, while irreversible
 and external calls need a person's approval.

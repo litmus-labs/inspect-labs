@@ -526,11 +526,15 @@ class ConnectorLab:
         """Nothing to release; each call opens and closes its own connection."""
 
 
-def connector_lab(directory: Path, *, profile: Path | str) -> ConnectorLab:
+def connector_lab(
+    directory: Path, *, profile: Path | str, screener: Screener | None = None
+) -> ConnectorLab:
     """Lab factory: a connector from a reviewed profile file.
 
     Args:
         directory: Private directory for this session's files.
         profile: Path to the connector profile JSON.
+        screener: Screens sequence arguments; without one, sequence calls are refused.
     """
-    return ConnectorLab(ConnectorProfile.model_validate_json(Path(profile).read_text()), directory)
+    profile_model = ConnectorProfile.model_validate_json(Path(profile).read_text())
+    return ConnectorLab(profile_model, directory, screener=screener)

@@ -33,6 +33,7 @@ from inspect_labs.bindings import (
 from inspect_labs.conformance import diagnose
 from inspect_labs.connectors import (
     ConnectorServer,
+    Screener,
     connector_lab,
     load_template,
     snapshot_connector,
@@ -66,21 +67,22 @@ class JudgeError(ValueError):
     """A ``--judge`` specification could not be loaded."""
 
 
-def load_judge(spec: str) -> EvidenceJudge:
-    """Load a judge named explicitly by the user as ``FILE.py:function`` or ``module:function``.
+def _load_callable(spec: str, option: str, what: str) -> object:
+    """Load a function named explicitly by the user as ``FILE.py:function`` or
+    ``module:function``.
 
     Raises:
         JudgeError: The specification is malformed, missing or not callable.
     """
     source, _, name = spec.rpartition(":")
     if not source or not name:
-        raise JudgeError("--judge must look like FILE.py:function or module:function")
+        raise JudgeError(f"{option} must look like FILE.py:function or module:function")
     try:
         if source.endswith(".py"):
             path = Path(source).resolve()
-            module_spec = importlib.util.spec_from_file_location(f"_judge_{path.stem}", path)
+            module_spec = importlib.util.spec_from_file_location(f"_loaded_{path.stem}", path)
             if module_spec is None or module_spec.loader is None:
-                raise JudgeError(f"Cannot load judge file {source}")
+                raise JudgeError(f"Cannot load {what} file {source}")
             sys.path.insert(0, str(path.parent))
             try:
                 module = importlib.util.module_from_spec(module_spec)
@@ -90,13 +92,22 @@ def load_judge(spec: str) -> EvidenceJudge:
         else:
             module = importlib.import_module(source)
     except FileNotFoundError as exc:
-        raise JudgeError(f"Judge file not found: {source}") from exc
+        raise JudgeError(f"{what.capitalize()} file not found: {source}") from exc
     except ImportError as exc:
-        raise JudgeError(f"Cannot import judge module {source}: {exc}") from exc
-    judge = getattr(module, name, None)
-    if not callable(judge):
-        raise JudgeError(f"{spec} is not a callable judge")
-    return cast(EvidenceJudge, judge)
+        raise JudgeError(f"Cannot import {what} module {source}: {exc}") from exc
+    loaded = getattr(module, name, None)
+    if not callable(loaded):
+        raise JudgeError(f"{spec} is not a callable {what}")
+    return loaded
+
+
+def load_judge(spec: str) -> EvidenceJudge:
+    """Load a judge named explicitly by the user as ``FILE.py:function`` or ``module:function``.
+
+    Raises:
+        JudgeError: The specification is malformed, missing or not callable.
+    """
+    return cast(EvidenceJudge, _load_callable(spec, "--judge", "judge"))
 
 
 def main() -> None:
@@ -144,6 +155,11 @@ def main() -> None:
     served.add_argument("--lab", help="Registered Lab name (see inspect-labs list)")
     served.add_argument(
         "--connector", type=Path, help="A reviewed connector profile (see inspect-labs connector)"
+    )
+    serve.add_argument(
+        "--screener",
+        help="Sequence screen for a connector, as FILE.py:function or module:function: an "
+        "async function taking one sequence and returning a ScreenVerdict",
     )
     serve.add_argument(
         "--lab-dir",
@@ -658,8 +674,15 @@ def _serve(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
     old_umask = os.umask(0o077)
     try:
         try:
+            if args.screener and not args.connector:
+                raise ValueError("--screener applies to --connector")
+            screener = (
+                cast(Screener, _load_callable(args.screener, "--screener", "screener"))
+                if args.screener
+                else None
+            )
             lab = (
-                connector_lab(args.lab_dir, profile=args.connector)
+                connector_lab(args.lab_dir, profile=args.connector, screener=screener)
                 if args.connector
                 else resolve("lab", args.lab, directory=args.lab_dir)
             )

@@ -287,3 +287,29 @@ def test_a_sequence_argument_that_cant_be_screened_is_refused(profile, tmp_path,
     with pytest.raises(ActionRefused, match="sequence-screen:unscreenable"):
         anyio.run(served.call, "order_sequence", {"sequence": value, "name": "x"})
     assert served.lab.calls == []
+
+
+def test_cli_serves_a_connector_with_a_screener(profile, tmp_path):
+    from mcp import Client, StdioServerParameters
+
+    profile_file = tmp_path / "profile.json"
+    profile_file.write_text(profile.model_dump_json())
+    screen = tmp_path / "screen.py"
+    screen.write_text(
+        "from inspect_labs.connectors import ScreenVerdict\n"
+        "async def screen(sequence):\n"
+        "    return ScreenVerdict(outcome='flagged', screener='file-screen')\n"
+    )
+    parameters = StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "inspect_labs.cli", "serve", "--connector", str(profile_file)]
+        + ["--screener", f"{screen}:screen", "--lab-dir", str(tmp_path / "lab")]
+        + ["--lab-log", str(tmp_path / "session.json")],
+    )
+
+    async def scenario():
+        async with Client(parameters) as client:
+            return await client.call_tool("order_sequence", {"sequence": SEQUENCE, "name": "x"})
+
+    refused = anyio.run(scenario)
+    assert refused.is_error and "sequence-screen:flagged" in refused.content[0].text
