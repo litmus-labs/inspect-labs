@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,12 +27,15 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, JsonValue
 
-EntryKind = Literal["started", "decided", "approval", "finished", "stopped", "flag", "ended"]
+EntryKind = Literal[
+    "opened", "started", "decided", "approval", "finished", "stopped", "flag", "ended"
+]
 
 JOURNAL_START = hashlib.sha256(b"inspect-labs/journal/v1").hexdigest()
 
-Witness = Callable[[int, str], None]
-"""Called with an entry's sequence number and digest, to keep a copy elsewhere."""
+Witness = Callable[[str, int, str], None]
+"""Called with the journal's id, an entry's sequence number and its digest, to keep a
+copy elsewhere."""
 
 
 class JournalEntry(BaseModel):
@@ -81,6 +85,9 @@ class Journal:
         self.head = JOURNAL_START
         self.sequence = 0
         self._witnessed = 0
+        self.id = uuid.uuid4().hex
+        """A random id, written first, that ties witness records to this journal."""
+        self.append("opened", {"journal": self.id})
 
     def append(self, kind: EntryKind, body: dict[str, JsonValue]) -> JournalEntry:
         """Write one entry and flush it to disk before returning.
@@ -106,7 +113,7 @@ class Journal:
 
     def _witness(self) -> None:
         if self.witness is not None and self._witnessed != self.sequence:
-            self.witness(self.sequence, self.head)
+            self.witness(self.id, self.sequence, self.head)
             self._witnessed = self.sequence
 
     def close(self) -> None:
@@ -120,6 +127,8 @@ class JournalCheck(BaseModel):
     """The result of reading a journal back."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+    id: str | None
+    """The journal's id from its first entry; None if it has none."""
     entries: list[JournalEntry]
     head: str
     ended: bool
@@ -152,7 +161,10 @@ def read_journal(path: Path) -> JournalCheck:
             raise ValueError(f"Journal entry {number} does not match its digest")
         head = entry.sha256
         entries.append(entry)
+    first = entries[0] if entries else None
+    journal_id = first.body.get("journal") if first and first.kind == "opened" else None
     return JournalCheck(
+        id=journal_id if isinstance(journal_id, str) else None,
         entries=entries,
         head=head,
         ended=bool(entries) and entries[-1].kind == "ended",
@@ -161,18 +173,20 @@ def read_journal(path: Path) -> JournalCheck:
 
 
 def witness_file(path: Path) -> Witness:
-    """A witness that appends ``sequence digest`` lines to a file.
+    """A witness that appends ``journal-id sequence digest`` lines to a file.
+
+    One file can witness many journals; each line names its journal.
 
     It is only as independent as where the file lives: keep it on storage the lab's
     operators can't rewrite, such as another machine or an append-only store.
     """
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
 
-    def witness(sequence: int, digest: str) -> None:
+    def witness(journal_id: str, sequence: int, digest: str) -> None:
         with os.fdopen(
             os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600), "a", encoding="utf-8"
         ) as stream:
-            stream.write(f"{sequence} {digest}\n")
+            stream.write(f"{journal_id} {sequence} {digest}\n")
             stream.flush()
             os.fsync(stream.fileno())
 
@@ -182,19 +196,30 @@ def witness_file(path: Path) -> Witness:
 def check_witness(journal: JournalCheck, witness_path: Path) -> list[str]:
     """Compare a journal with a witness file; returns each disagreement.
 
-    Every witnessed digest must match the journal's entry with that sequence, and a
-    witnessed entry must not be missing from the journal.
+    Only the witness lines for this journal's id count. Every one must match the
+    journal's entry with that sequence, and there must be at least one: a journal
+    the witness never saw, such as one rebuilt under a new id, is reported.
     """
+    if journal.id is None:
+        return ["the journal has no id, so it can't be matched to a witness"]
     by_sequence = {entry.sequence: entry.sha256 for entry in journal.entries}
     problems = []
+    witnessed = 0
     for line in witness_path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
+        parts = line.split()
+        if len(parts) != 3:
+            if line.strip():
+                problems.append(f"unreadable witness line: {line[:80]}")
             continue
-        sequence_text, _, digest = line.partition(" ")
-        sequence = int(sequence_text)
-        recorded = by_sequence.get(sequence)
+        journal_id, sequence_text, digest = parts
+        if journal_id != journal.id:
+            continue
+        witnessed += 1
+        recorded = by_sequence.get(int(sequence_text))
         if recorded is None:
-            problems.append(f"entry {sequence} was witnessed but is missing from the journal")
-        elif recorded != digest.strip():
-            problems.append(f"entry {sequence} differs from its witnessed digest")
+            problems.append(f"entry {sequence_text} was witnessed but is missing from the journal")
+        elif recorded != digest:
+            problems.append(f"entry {sequence_text} differs from its witnessed digest")
+    if not witnessed:
+        problems.append("the witness has no record of this journal")
     return problems
