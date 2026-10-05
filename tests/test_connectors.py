@@ -323,7 +323,11 @@ def test_an_explicit_null_is_passed_on_and_an_omitted_argument_is_not(profile, t
     assert omitted == "received query-string=P1"
 
 
-def test_a_connector_is_refused_without_rules(profile, tmp_path):
+def test_a_connector_is_refused_without_rules(profile, tmp_path, monkeypatch):
+    def no_connection(server):
+        raise AssertionError("the connector must not be contacted without rules")
+
+    monkeypatch.setattr("inspect_labs.connectors._client", no_connection)
     outputs = [
         ModelOutput.from_message(
             ChatMessageAssistant(

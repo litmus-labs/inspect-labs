@@ -736,7 +736,12 @@ def connect_lab(
             problems = compatibility_problems(required, info.capabilities, info.operations)
             if info.mode == "physical" and not allow_physical:
                 problems.append("physical mode requires explicit host authorization")
-            if rules is None and lab_checks(provider):
+            try:
+                own_checks = lab_checks(provider)
+            except TypeError:
+                await provider.close()
+                raise
+            if rules is None and own_checks:
                 # A Lab's own safety checks run in the gateway; without rules they
                 # would be skipped silently, so refuse instead.
                 problems.append("this Lab has its own safety checks, which need rules")
@@ -754,7 +759,7 @@ def connect_lab(
                     rules,
                     approver,
                     records=session.actions,
-                    checks=(*lab_checks(provider), *checks),
+                    checks=(*own_checks, *checks),
                 )
                 lab_tools = [_checked_tool(lab_tool, gateway) for lab_tool in lab_tools]
             state.tools = [*state.tools, *lab_tools]

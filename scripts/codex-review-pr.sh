@@ -13,7 +13,8 @@ pr="${1:?Usage: scripts/codex-review-pr.sh PR_NUMBER [--post]}"
 post="${2:-}"
 repo_root="$(git rev-parse --show-toplevel)"
 work="$(mktemp -d)"
-base_branch="codex-review-base-$pr"
+# A unique name per run, so concurrent reviews never touch each other's branch.
+base_branch="codex-review-base-$pr-$$-$(date +%s)"
 cleanup() {
   git -C "$repo_root" worktree remove --force "$work/tree" >/dev/null 2>&1 || true
   git -C "$repo_root" branch -q -D "$base_branch" >/dev/null 2>&1 || true
