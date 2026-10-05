@@ -29,6 +29,7 @@ def test_declared_module_inventory_and_dependencies() -> None:
             "inspect_labs.spec",
         },
         "journal": {"pydantic"},
+        "release": {"pydantic"},
         "operators": {"anyio", "pydantic", "inspect_labs.actions", "inspect_labs.gateway"},
         "serve": {
             "anyio",
@@ -102,6 +103,7 @@ def test_declared_module_inventory_and_dependencies() -> None:
             "inspect_labs.gateway",
             "inspect_labs.journal",
             "inspect_labs.operators",
+            "inspect_labs.release",
             "inspect_labs.serve",
             "pydantic",
             "anyio",
