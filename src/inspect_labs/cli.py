@@ -31,6 +31,13 @@ from inspect_labs.bindings import (
     rescore,
 )
 from inspect_labs.conformance import diagnose
+from inspect_labs.connectors import (
+    ConnectorServer,
+    Screener,
+    connector_lab,
+    load_template,
+    snapshot_connector,
+)
 from inspect_labs.evidence import rescore_evidence
 from inspect_labs.gateway import (
     ApprovedAction,
@@ -60,21 +67,22 @@ class JudgeError(ValueError):
     """A ``--judge`` specification could not be loaded."""
 
 
-def load_judge(spec: str) -> EvidenceJudge:
-    """Load a judge named explicitly by the user as ``FILE.py:function`` or ``module:function``.
+def _load_callable(spec: str, option: str, what: str) -> object:
+    """Load a function named explicitly by the user as ``FILE.py:function`` or
+    ``module:function``.
 
     Raises:
         JudgeError: The specification is malformed, missing or not callable.
     """
     source, _, name = spec.rpartition(":")
     if not source or not name:
-        raise JudgeError("--judge must look like FILE.py:function or module:function")
+        raise JudgeError(f"{option} must look like FILE.py:function or module:function")
     try:
         if source.endswith(".py"):
             path = Path(source).resolve()
-            module_spec = importlib.util.spec_from_file_location(f"_judge_{path.stem}", path)
+            module_spec = importlib.util.spec_from_file_location(f"_loaded_{path.stem}", path)
             if module_spec is None or module_spec.loader is None:
-                raise JudgeError(f"Cannot load judge file {source}")
+                raise JudgeError(f"Cannot load {what} file {source}")
             sys.path.insert(0, str(path.parent))
             try:
                 module = importlib.util.module_from_spec(module_spec)
@@ -84,13 +92,22 @@ def load_judge(spec: str) -> EvidenceJudge:
         else:
             module = importlib.import_module(source)
     except FileNotFoundError as exc:
-        raise JudgeError(f"Judge file not found: {source}") from exc
+        raise JudgeError(f"{what.capitalize()} file not found: {source}") from exc
     except ImportError as exc:
-        raise JudgeError(f"Cannot import judge module {source}: {exc}") from exc
-    judge = getattr(module, name, None)
-    if not callable(judge):
-        raise JudgeError(f"{spec} is not a callable judge")
-    return cast(EvidenceJudge, judge)
+        raise JudgeError(f"Cannot import {what} module {source}: {exc}") from exc
+    loaded = getattr(module, name, None)
+    if not callable(loaded):
+        raise JudgeError(f"{spec} is not a callable {what}")
+    return loaded
+
+
+def load_judge(spec: str) -> EvidenceJudge:
+    """Load a judge named explicitly by the user as ``FILE.py:function`` or ``module:function``.
+
+    Raises:
+        JudgeError: The specification is malformed, missing or not callable.
+    """
+    return cast(EvidenceJudge, _load_callable(spec, "--judge", "judge"))
 
 
 def main() -> None:
@@ -134,7 +151,16 @@ def main() -> None:
     serve = commands.add_parser(
         "serve", help="Serve a Lab to an MCP agent over stdio, every action through the gateway"
     )
-    serve.add_argument("--lab", required=True, help="Registered Lab name (see inspect-labs list)")
+    served = serve.add_mutually_exclusive_group(required=True)
+    served.add_argument("--lab", help="Registered Lab name (see inspect-labs list)")
+    served.add_argument(
+        "--connector", type=Path, help="A reviewed connector profile (see inspect-labs connector)"
+    )
+    serve.add_argument(
+        "--screener",
+        help="Sequence screen for a connector, as FILE.py:function or module:function: an "
+        "async function taking one sequence and returning a ScreenVerdict",
+    )
     serve.add_argument(
         "--lab-dir",
         type=Path,
@@ -216,6 +242,28 @@ def main() -> None:
     )
     journal.add_argument("path", type=Path, help="The session's .journal.jsonl")
     journal.add_argument("--witness", type=Path, help="A witness file to compare with")
+    connector = commands.add_parser(
+        "connector", help="Pin and classify an MCP connector's tools for review"
+    )
+    connector_commands = connector.add_subparsers(dest="connector_command", required=True)
+    snapshot = connector_commands.add_parser(
+        "snapshot", help="List a connector's tools and write a profile to review"
+    )
+    snapshot.add_argument("name", help="A short name, such as pubmed")
+    where = snapshot.add_mutually_exclusive_group(required=True)
+    where.add_argument("--command", dest="server_command", help="Command that starts the server")
+    where.add_argument("--url", help="The server's https URL")
+    snapshot.add_argument(
+        "--arg", action="append", default=[], dest="server_args", help="Server argument (repeat)"
+    )
+    snapshot.add_argument(
+        "--env", action="append", default=[], help="Environment variable to pass (repeat)"
+    )
+    snapshot.add_argument(
+        "--template",
+        help="Classifications to apply: a built-in template name or a JSON file",
+    )
+    snapshot.add_argument("--output", type=Path, required=True, help="Profile to write")
     release = commands.add_parser(
         "release", help="Write a lab log released at one tier, with its key in a private file"
     )
@@ -309,6 +357,40 @@ def main() -> None:
                 )
                 if problems:
                     sys.exit(1)
+                return
+            if args.command == "connector":
+                try:
+                    template = load_template(args.template) if args.template else None
+                    server = ConnectorServer(
+                        command=args.server_command,
+                        args=tuple(args.server_args),
+                        url=args.url,
+                        env=tuple(args.env),
+                    )
+                    profile = anyio.run(
+                        lambda: snapshot_connector(args.name, server, template=template)
+                    )
+                    _write_text_new(args.output, profile.model_dump_json(indent=2) + "\n")
+                except (LookupError, ValueError, OSError) as exc:
+                    parser.error(f"Cannot snapshot: {type(exc).__name__}: {exc}")
+                unclassified = sorted(n for n, t in profile.tools.items() if t.action is None)
+                disagreements = sorted(
+                    n
+                    for n, t in profile.tools.items()
+                    if t.server_hints and t.server_hints.disagrees_with(t.action)
+                )
+                print(
+                    json.dumps(
+                        {
+                            "profile": str(args.output),
+                            "tools": len(profile.tools),
+                            "unclassified": unclassified,
+                            "server_hints_disagree": disagreements,
+                        },
+                        indent=2,
+                    ),
+                    file=stdout,
+                )
                 return
             if args.command == "release":
                 try:
@@ -580,12 +662,30 @@ def main() -> None:
         os.umask(old_umask)
 
 
+def _write_text_new(path: Path, text: str) -> None:
+    """Write a new private file; never overwrite."""
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as stream:
+        stream.write(text)
+
+
 def _serve(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
     """Serve one Lab session over MCP stdio and report the lab log on stderr."""
     old_umask = os.umask(0o077)
     try:
         try:
-            lab = resolve("lab", args.lab, directory=args.lab_dir)
+            if args.screener and not args.connector:
+                raise ValueError("--screener applies to --connector")
+            screener = (
+                cast(Screener, _load_callable(args.screener, "--screener", "screener"))
+                if args.screener
+                else None
+            )
+            lab = (
+                connector_lab(args.lab_dir, profile=args.connector, screener=screener)
+                if args.connector
+                else resolve("lab", args.lab, directory=args.lab_dir)
+            )
             rules = (
                 ActionRules.model_validate_json(args.rules.read_text())
                 if args.rules

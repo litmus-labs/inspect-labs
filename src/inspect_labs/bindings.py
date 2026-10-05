@@ -605,8 +605,15 @@ def _checked_tool(tool: Tool, gateway: Gateway) -> Tool:
     definition = ToolDef(tool)
 
     async def run(**arguments: Any) -> Any:
+        # Inspect fills in defaults; a Lab can mark "not given" defaults (such as a
+        # connector's optional arguments) so they are neither recorded nor passed on.
+        given = {
+            name: value
+            for name, value in arguments.items()
+            if not getattr(value, "inspect_labs_omitted", False)
+        }
         try:
-            return await gateway.run(definition.name, arguments, lambda: tool(**arguments))
+            return await gateway.run(definition.name, given, lambda: tool(**given))
         except ActionRefused as exc:
             raise ToolError(str(exc)) from exc
 
@@ -661,7 +668,8 @@ def connect_lab(
             approved. Without one, held actions are refused.
         monitors: Run after scoring each sample; flags go into the score's metadata.
         checks: Domain checks run after ``rules``, together with the Lab's own
-            ``checks``. They can make a decision stricter, never looser. Need ``rules``.
+            ``checks``. They can make a decision stricter, never looser. Need ``rules``;
+            a Lab with its own checks is refused without them.
 
     Returns:
         The native Task, with setup, scorer and cleanup bindings installed.
@@ -728,6 +736,15 @@ def connect_lab(
             problems = compatibility_problems(required, info.capabilities, info.operations)
             if info.mode == "physical" and not allow_physical:
                 problems.append("physical mode requires explicit host authorization")
+            try:
+                own_checks = lab_checks(provider)
+            except TypeError:
+                await provider.close()
+                raise
+            if rules is None and own_checks:
+                # A Lab's own safety checks run in the gateway; without rules they
+                # would be skipped silently, so refuse instead.
+                problems.append("this Lab has its own safety checks, which need rules")
             if problems:
                 await provider.close()
                 raise CompatibilityError("Unsupported lab requirements: " + "; ".join(problems))
@@ -742,7 +759,7 @@ def connect_lab(
                     rules,
                     approver,
                     records=session.actions,
-                    checks=(*lab_checks(provider), *checks),
+                    checks=(*own_checks, *checks),
                 )
                 lab_tools = [_checked_tool(lab_tool, gateway) for lab_tool in lab_tools]
             state.tools = [*state.tools, *lab_tools]
