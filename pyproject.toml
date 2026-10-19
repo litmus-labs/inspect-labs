@@ -41,7 +41,7 @@ inspect-labs = "inspect_labs.cli:main"
 
 [project.optional-dependencies]
 serve = ["mcp>=2.3,<3"]
-dev = ["pytest>=8,<10", "ruff>=0.12,<1", "mypy>=1.15,<2", "build>=1.2,<2"]
+dev = ["pytest>=8,<10", "ruff>=0.12,<1", "mypy>=1.15,<3", "build>=1.2,<2"]
 # Native OpenAI/OpenRouter providers. Inspect 0.3.249 declares openai>=2.45; openai 3.x
 # failed at the HTTP transport (httpcore timeout TypeError) before any generation.
 openai = ["openai>=2.45,<3"]
