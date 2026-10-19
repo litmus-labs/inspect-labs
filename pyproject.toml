@@ -44,7 +44,7 @@ serve = ["mcp>=2.3,<3"]
 dev = ["pytest>=8,<10", "ruff>=0.12,<1", "mypy>=1.15,<2", "build>=1.2,<2"]
 # Native OpenAI/OpenRouter providers. Inspect 0.3.249 declares openai>=2.45; openai 3.x
 # failed at the HTTP transport (httpcore timeout TypeError) before any generation.
-openai = ["openai>=2.45,<3"]
+openai = ["openai>=2.45,<4"]
 pylabrobot = ["pylabrobot==0.2.2"]
 robots = ["inspect-robots @ git+https://github.com/robocurve/inspect-robots.git@3c832c34b6c11fa5205ff80ab4947247fedd5eea"]
 
